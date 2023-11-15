@@ -16,7 +16,7 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi.
-From elpi.apps Require Export tc.
+From elpi.apps Require Export tc coercion.
 
 From elpi.apps.tc Extra Dependency "base.elpi" as base.
 From elpi.apps.tc Extra Dependency "tc_aux.elpi" as tc_aux.
@@ -636,6 +636,7 @@ HB.structure Definition StructureName params :=
 *)
 
 #[arguments(raw)] Elpi Command HB.structure.
+Elpi Accumulate Db coercion.db.
 Elpi Accumulate Db tc.db.
 Elpi Accumulate Db tc_options.db.
 Elpi Accumulate Db hb.db.
