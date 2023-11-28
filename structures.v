@@ -14,6 +14,8 @@ Definition eta {T} (x : T) := x.
 Definition ignore {T} (x: T) := x.
 Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
+Ltac done_tc := done || apply _.
+
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi.
 From elpi.apps Require Export tc coercion.
@@ -706,7 +708,8 @@ Elpi Accumulate File "HB/context.elpi".
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate lp:{{
-main [] :- !, with-attributes (with-logging (instance.saturate-instances)).
+main [] :- !, with-attributes (with-logging (instance.saturate-instances TCClauses)),
+  coq.say "in saturate got TCClauses" TCClauses.
 main _ :- coq.error "Usage: HB.saturate".
 }}.
 Elpi Typecheck.

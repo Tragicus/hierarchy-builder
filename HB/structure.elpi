@@ -529,7 +529,6 @@ declare-class+structure MLwP Sort
 
   w-params.then MLwP (mk-parameter explicit) (mk-parameter explicit)
     synthesize-fields.body ClassDeclaration,
-  coq.say "ClassDeclaration" ClassDeclaration,
 
   std.assert-ok! (coq.typecheck-indt-decl ClassDeclaration) "declare-class: illtyped",
   (@primitive! => log.coq.env.add-indt ClassDeclaration ClassInd),
