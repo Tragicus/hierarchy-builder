@@ -443,8 +443,7 @@ mk-tc-instance.complete-term (prod _N T Body) [Arg|Args] [ArgR|ArgsR] :- !,
   coq.say "Arg is" Arg,
   saturate-type-constructor Arg ArgR,
   coq.say "saturated arg" ArgR,
-  std.spy(coq.typecheck ArgR U ok),
-  std.spy(coq.unify-leq U T ok),
+  std.spy(coq.typecheck ArgR T ok),
   coq.say "typecheck" ArgR T,
 
   mk-tc-instance.complete-term (Body ArgR) Args ArgsR.
