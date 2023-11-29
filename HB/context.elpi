@@ -43,7 +43,7 @@ declare.mixins TheType TheParamsSection MLwPRaw MLwP MSL CL :-  std.do! [
   std.rev MLwPRev MLwPSection,
   build-list-w-params TheParamsSection TheType MLwPSection MLwP,
   acc-clauses current MSL,
-  coq.say "in context got TCClauses" TCClauses
+  std.forall TCClauses (x\ sigma c t cl\ x = pr c t, mk-tc-instance c t cl, coq.elpi.accumulate _ "tc.db" (clause _ (after "0") cl))
 ].
 
 /* ------------------------------------------------------------------------- */

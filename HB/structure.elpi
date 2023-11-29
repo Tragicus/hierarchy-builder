@@ -670,7 +670,6 @@ pack-body ClassName PL T MLwA F :- std.do! [
 ].
 pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
   synthesis.infer-all-gref-deps PL T BuildC Class,
-  coq.say "args" PackS PL T Class,
   mk-app (global PackS) {std.append PL [T, Class]} Body
 ].
 

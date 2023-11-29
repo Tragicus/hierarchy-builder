@@ -69,8 +69,7 @@ declare-const Name BodySkel TyWPSkel CSL :- std.do! [
 
   private.declare-instance Factory TheType TheFactory Clauses TCClauses CSL,
 
-  coq.env.section VR,
-  std.map TCClauses (x\ r\ sigma c t tr\ x = pr c t, coq.abstract-const-decl VR (pr t _) (pr tr _), r = pr c tr) Insts,
+  std.map TCClauses (x\ r\ sigma c t tr n\ x = pr c t, coq.env.fresh-global-id "TC_instance_" n, coq.env.add-const n t _ _ tr, r = pr c tr) Insts,
 
   % handle parameters via a section -- end
   if (TyWP = arity _) true (
@@ -80,8 +79,16 @@ declare-const Name BodySkel TyWPSkel CSL :- std.do! [
 
   % we accumulate clauses now that the section is over
   acc-clauses current Clauses,
-  coq.say "Insts" Insts,
-  std.forall Insts (x\ sigma c t cl\ x = pr c t, mk-tc-instance c t cl, coq.elpi.accumulate _ "tc.db" (clause _ (after "0") cl)),
+
+  if (coq.env.section []) true
+    (coq.warning "HB" "HB.instance"
+    "You are declaring an instance inside a section. If this command fails, it is likely
+     due to section variables."),
+  std.forall Insts (x\ sigma c t cl tr\
+    x = pr c t,
+    coq.env.const t (some tr) _,
+    mk-tc-instance c tr cl,
+    coq.elpi.accumulate _ "tc.db" (clause _ (after "0") cl)),
 ].
 
 % [declare-all T CL MCSTL] given a type T and a list of class definition
@@ -435,64 +442,3 @@ check-non-forgetful-inheritance T Factory :- std.do! [
 ].
 
 }}
-
-% Turns a term extracted from a context into a well-typed term, applying the partially
-% applied subterms to the right number of argument and abstracting the now undeclared constants.
-pred mk-tc-instance.complete-term i:term, i:list term, o:list term.
-mk-tc-instance.complete-term (prod _N T Body) [Arg|Args] [ArgR|ArgsR] :- !,
-  coq.say "Arg is" Arg,
-  saturate-type-constructor Arg ArgR,
-  coq.say "saturated arg" ArgR,
-  std.spy(coq.typecheck ArgR T ok),
-  coq.say "typecheck" ArgR T,
-
-  mk-tc-instance.complete-term (Body ArgR) Args ArgsR.
-mk-tc-instance.complete-term _ Args Args.
-
-pred mk-tc-instance.under-binders.mk-predicate i:gref, i:term, i:list sealed-goal, i:list term, i:term, o:prop.
-mk-tc-instance.under-binders.mk-predicate Class Ty Goals Args I Clause :-
-  coq.say "mk-predicate" Class Ty Goals Args I,
-  gref->pred-name Class P,
-  coq.say "pred-name",
-  std.append Args [I] Argsx,
-  coq.say "appended I",
-  coq.elpi.predicate P Argsx C,
-  coq.say "got predicate" I TI,
-  coq.typecheck I TI ok,
-  coq.say "typechecked",
-  if (TI = app [_|ArgsI]) (true) (ArgsI = []),
-  coq.say "defining clause",
-  Clause = (C :-
-    coq.typecheck I Ty ok,
-    std.forall2 Args ArgsI (x\ y\ coq.unify-eq x y ok),
-    coq.ltac.collect-goals I Goals [],
-    @no-tc! => std.forall Goals (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []),
-    coq.ltac.collect-goals I [] []),
-	 coq.say "defined clause".
-
-pred mk-tc-instance.under-binders i:gref, i:term, i:term, i:list term, o:prop.
-mk-tc-instance.under-binders Class TC (fun N T Body) L (pi x\ C x) :- !,
-  @pi-decl N T x\ mk-tc-instance.under-binders Class TC (Body x) L (C x).
-mk-tc-instance.under-binders Class (prod N T Body) X L (pi x\ C x) :- !,
-  @pi-decl N T x\ mk-tc-instance.under-binders Class (Body x) X [x|L] (C x).
-mk-tc-instance.under-binders Class _TC I Args (pi x y\ Clause x y) :-
-  (pi x y\ mk-tc-instance.under-binders.mk-predicate Class x y Args I (Clause x y)).
-
-% [mk-tc-instance Class I Clause] builds the clause to add to the tc database corresponding
-% to the instance I of class Class. The lambda abstractions in I are abstracted as variables
-% for Clause and if under these I is an application, saturates its arguments. *)
-pred mk-tc-instance i:gref, i:term, o:prop.
-mk-tc-instance Class (fun N T Body) (pi x\ C x) :- !,
-  @pi-decl N T x\ mk-tc-instance Class (Body x) (C x).
-mk-tc-instance Class (app [Head|Args]) Clause :- !,
-  coq.typecheck Head T ok,
-  coq.say "args" Args,
-  mk-tc-instance.complete-term T Args ArgsC,
-  coq.say "instance is" (app [Head|ArgsC]),
-  abstract-holes.main (app [Head|ArgsC]) I,
-  coq.say "abstracted holes" I,
-  coq.typecheck (global Class) TC ok,
-  mk-tc-instance.under-binders Class TC I [] Clause.
-mk-tc-instance Class I Clause :-
-  coq.typecheck (global Class) TC ok,
-  mk-tc-instance.under-binders Class TC I [] Clause.
