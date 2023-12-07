@@ -14,7 +14,7 @@ Definition eta {T} (x : T) := x.
 Definition ignore {T} (x: T) := x.
 Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
-Ltac done_tc := done || apply _.
+Ltac done_tc := trivial || apply _ || done.
 
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi.
@@ -480,8 +480,8 @@ Elpi Accumulate lp:{{
 main [A] :- A = indt-decl _, !,
   with-attributes (with-logging (factory.declare-mixin A)).
 
-main _ :-
-  coq.error "Usage: HB.mixin Record <MixinName> T of F A & … := { … }.".
+main L :-
+  coq.error "Usage: HB.mixin Record <MixinName> T of F A & … := { … }, received " L.
 }}.
 Elpi Typecheck.
 Elpi Export HB.mixin.
