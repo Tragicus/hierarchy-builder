@@ -280,7 +280,7 @@ structure-instance->mixin-srcs T S MSLC :- std.do! [
   %coq.say "unified with T" T SortHolesST,
   % Should not unification infer the typeclasses?
   coq.ltac.collect-goals SortHolesST GST [],
-  std.forall GST (g\ std.spy(coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g [])),
+  std.forall GST (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []),
   %coq.say "final SortHolesST" SortHolesST,
   % we look for an instance which is concrete, we take the parts
   get-constructor S KS,

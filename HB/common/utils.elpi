@@ -351,22 +351,23 @@ mk-tc-instance.under-binders.mk-predicate Class Args I Clause :-
   coq.elpi.predicate P Argsx C,
   coq.typecheck I TI ok,
   if (TI = app [_|ArgsI]) (true) (ArgsI = []),
-  Clause = (pi time fails argsR\ C :- std.do! [coq.say "enter " P, coq.say "",
+  Clause = (pi time fails argsR ipr argsRpr\ C :- std.do! [%coq.say "enter " P, coq.say "",
    std.time (if (
       std.map Args coq.reduction.lazy.bi-norm argsR,
-      coq.say "try instance " I "for " argsR, coq.say "",
-      @no-tc!
-			=> (pi x y p csx csy okx oky\
-				std.forall2 [x] [y] p :- !,
-					if (coq.term-is-gref? x csx, !,
-						coq.term-is-gref? y csy)
-						(csx = csy) (true),
-					coq.unify-eq x y ok)
-			=> std.forall2 argsR ArgsI (x\ y\ coq.unify-eq x y ok),
+		coq.term->string I ipr,
+		std.map argsR coq.term->string argsRpr,
+      %coq.say "try instance " ipr "for " argsRpr, coq.say "",
+		(pi x y p csx csy okx oky\
+			std.forall2 [x] [y] p :- !,
+				if (coq.term-is-gref? x csx) (!,
+					if (coq.term-is-gref? y csy)
+					(csx = csy) (true)) (true))
+			=> std.forall2 argsR ArgsI (x\ y\ true),
+		@no-tc! => std.forall2 argsR ArgsI (x\ y\ coq.unify-eq x y ok),
 		%coq.say "unified args" I, coq.say "",
 		@no-tc! => solve-all-with I "done_tc",
-		coq.ltac.collect-goals I [] [] ) (fails = true, coq.say "success" I, coq.say ""
-		                                              ) (fails = fail, coq.say "failure" I, coq.say ""
+		coq.ltac.collect-goals I [] [] ) (fails = true%, coq.say "success" ipr, coq.say ""
+		                                              ) (fails = fail%, coq.say "failure" ipr, coq.say ""
 																	 )) time,
     %coq.say "exit time " time, coq.say "",
 	 %coq.say "leaving " P "\n",

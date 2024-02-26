@@ -6,7 +6,7 @@ namespace flush {
 pred flush.
 flush :- if (structure.pred-to-flush C SP CP)
   (coq.elpi.accumulate _ "tc.db" (clause _ (before "1") {structure.private.mk-sortclass-instance C SP CP})
-    %, coq.elpi.accumulate _ "tc.db" (clause _ (before "1") {structure.private.mk-context-instance C})
+    , coq.elpi.accumulate _ "tc.db" (clause _ (before "1") {structure.private.mk-context-instance C})
 	 )
   (true).
 

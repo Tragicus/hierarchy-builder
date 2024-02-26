@@ -14,8 +14,13 @@ Definition eta {T} (x : T) := x.
 Definition ignore {T} (x: T) := x.
 Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
-Ltac iter_exact := match goal with _ : _ |- ?G => idtac "goal "; idtac G end; match goal with H : _ |- _ => exact H end.
-Ltac done_tc := apply _ || done.
+Ltac print_goal := 
+  match goal with _ : _ |- ?G => idtac "goal " G end.
+Ltac print_context :=
+  match goal with H : _ |- _ => idtac "ctx " H; fail end || idtac.
+Ltac iter_exact := print_goal; print_context;
+  match goal with H : _ |- _ => idtac "try exact " H; (exact H; idtac "success") || (idtac "failed"; fail) end.
+Ltac done_tc := apply _ || trivial.
 
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi.
@@ -26,10 +31,13 @@ Elpi TC.AddAllInstances.
 
 From elpi.apps.tc Extra Dependency "base.elpi" as base.
 From elpi.apps.tc Extra Dependency "tc_aux.elpi" as tc_aux.
+From elpi.apps.tc Extra Dependency "ho_unif.elpi" as ho_unif.
+From elpi.apps.tc Extra Dependency "modes.elpi" as modes.
 From elpi.apps.tc Extra Dependency "create_tc_predicate.elpi" as create_tc_predicate.
 From elpi.apps.tc Extra Dependency "compiler.elpi" as compiler.
 
 Elpi Override TC TC.Solver All.
+Elpi Override CS All.
 
 Register unify as hb.unify.
 Register id_phant as hb.id.
@@ -308,6 +316,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -348,6 +357,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -396,6 +406,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/status.elpi".
@@ -431,6 +442,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -486,6 +498,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -494,6 +507,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
 Elpi Accumulate File "HB/export.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate lp:{{
@@ -575,6 +589,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -604,6 +619,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -687,6 +703,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -695,6 +712,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/export.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate File "HB/structure.elpi".
@@ -766,9 +784,20 @@ coq.term-is-gref? (let _ _ T x\x) GR :- !, coq.term-is-gref? T GR.
 pred solve-all-with i:term, i:string.
 solve-all-with T Tac :-
   coq.typecheck T _ ok,
+  %coq.say "solve-all-with" {coq.term->string T},
   coq.ltac.collect-goals T G _,
   if (G = []) (true) (
-    std.forall G (g\ coq.ltac.open (coq.ltac.call-ltac1 Tac) g []), !
+    std.forall G (g\ coq.ltac.open (coq.ltac.call-ltac1 Tac) g []), !,
+	 solve-all-with T Tac).
+}}.
+
+Elpi Accumulate cs.db lp:{{
+pred solve-all-with i:term, i:string.
+solve-all-with T Tac :-
+  coq.typecheck T _ ok,
+  coq.ltac.collect-goals T G _,
+  if (G = []) (true) (
+    std.forall G (g\ coq.ltac.open (coq.ltac.call-ltac1 Tac) g []), !,
 	 solve-all-with T Tac).
 }}.
 
@@ -784,6 +813,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -792,6 +822,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/export.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate File "HB/structure.elpi".
@@ -828,6 +859,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -836,6 +868,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/export.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate lp:{{
@@ -883,6 +916,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -931,6 +965,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -939,6 +974,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
 Elpi Accumulate File "HB/export.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate lp:{{
@@ -1021,6 +1057,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -1029,6 +1066,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
 Elpi Accumulate File "HB/export.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate File "HB/builders.elpi".
@@ -1069,6 +1107,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -1149,6 +1188,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -1201,6 +1241,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -1290,6 +1331,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".
@@ -1298,6 +1340,7 @@ Elpi Accumulate File "HB/common/phant-abbreviation.elpi".
 Elpi Accumulate File "HB/export.elpi".
 Elpi Accumulate File "HB/instance.elpi".
 Elpi Accumulate File "HB/context.elpi".
+Elpi Accumulate File modes.
 Elpi Accumulate File create_tc_predicate.
 Elpi Accumulate File "HB/factory.elpi".
 Elpi Accumulate lp:{{
@@ -1333,6 +1376,7 @@ Elpi Accumulate File "HB/common/database.elpi".
 #[only="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_816.elpi".
 Elpi Accumulate File base.
 Elpi Accumulate File tc_aux.
+Elpi Accumulate File ho_unif.
 Elpi Accumulate File compiler.
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/log.elpi".

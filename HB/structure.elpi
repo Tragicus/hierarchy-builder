@@ -345,11 +345,18 @@ mk-sortclass-instance.under-binders Class (prod _ T BodyC) SP (prod N T BodySP) 
   @pi-decl N T x\ mk-sortclass-instance.under-binders Class (BodyC x) SP (BodySP x) CP [x|L] (C x).
 mk-sortclass-instance.under-binders Class _ SP (prod N T _) CP L (pi x y z\ Clause x y z) :- !,
   gref->pred-name Class P,
-  @pi-decl N T x\ std.rev [x|L] (Lx x), pi y z\
-	 coq.elpi.predicate P {std.rev [y, z|L]} (C x y z),
-	 (Clause x y z) = (C x y z :- coq.say "enter " P "for sortclass " y z,
-		mk-app CP (Lx x) y,
-		mk-app SP (Lx x) z).
+  @pi-decl N T x\ std.append L [x] (Lx x), pi y z\
+	 coq.elpi.predicate P {std.append L [y, z]} (C x y z),
+	 (Clause x y z) = (pi lpr ypr zpr\ C x y z :-
+	   std.map L coq.term->string lpr,
+		coq.term->string y ypr,
+		coq.term->string z zpr,
+	   %coq.say "enter " P "for sortclass " lpr ypr zpr,
+		not (var y),
+		mk-app SP (Lx x) y,
+		mk-app CP (Lx x) z
+		%,coq.say "sortclass succeeded"
+		).
 mk-sortclass-instance.under-binders Class _ _ _ _ [] _ :-
 	coq.error "mk-sortclass-instance : Class" Class "has no subject.".
 mk-sortclass-instance.under-binders Class _ SP _ _ _ _ :-
@@ -368,13 +375,13 @@ pred mk-context-instance.under-binders.mk-predicate i:gref, i:list term, i:term,
 mk-context-instance.under-binders.mk-predicate Class ArgsC I TI Clause :-
   gref->pred-name Class P,
   coq.elpi.predicate P {std.rev [I|ArgsC]} C,
-  Clause = (pi shgoals goals\ C :- coq.say "enter " P " with context",
+  Clause = (pi shgoals goals ipr\ C :- %coq.say "enter " P " with context",
 		coq.typecheck I TI ok,
-      coq.say "try instance " I,
+		coq.term->string I ipr,
+      %coq.say "try instance " ipr,
 		coq.ltac.collect-goals I goals shgoals,
-		coq.say "goals: " goals shgoals,
-		solve-all-with I "iter_exact",
-      coq.ltac.collect-goals I [] [], coq.say "success"
+		solve-all-with I "assumption",
+      coq.ltac.collect-goals I [] []%, coq.say "success"
 		).
 
 pred mk-context-instance.under-binders i:gref, i:term, i:gref, i:term, i:list term, i:list term, o:prop.
@@ -717,9 +724,7 @@ clone-phant-body ClassName SortProjection ((indt I) as Structure) PL T _ PhF :- 
 % under a context with P and T
 pred pack-body i:classname, i:list term, i:term, i:list (w-args mixinname), o:term.
 pack-body ClassName PL T MLwA F :- std.do! [
-	coq.say "pack body" ClassName,
   class-def (class ClassName S _),
-  coq.say "got" S,
   get-constructor ClassName BuildC,
   get-constructor S PackS,
   synthesis.under-mixins.then MLwA mk-fun
@@ -735,41 +740,36 @@ pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
 %  deferring the instanciation of the class field to typeclass resolution.
 pred sort-cs-catch-all i:classname.
 sort-cs-catch-all ClassName :- std.do! [
-	coq.say "sort cs" ClassName,
   class-def (class ClassName S _),
-  coq.say "1",
   get-constructor S PackS,
-  coq.say "2",
   get-structure-sort-projection S Ssort,
-  coq.say "3",
   coq.elpi.accumulate _ "cs.db" (clause _ _ (
-    pi ctx lhs rhs res params paramsx cl partial ty\
+    pi ctx lhs rhs res params paramsx cl ty\
 		cs ctx lhs rhs res :-
 		  if (lhs = app [Ssort | params]) true (lhs = Ssort, params = []),
 		  std.append params [rhs, cl] paramsx,
-		  mk-app (global PackS) paramsx partial,
+		  mk-app (global PackS) paramsx res,
 		  mk-app (global S) params ty,
-		  coq.elaborate-skeleton partial ty res ok)),
-		  coq.say "ok"].
+		  coq.typecheck res ty ok,
+		  solve-all-with res "done_tc"))].
 
 % [class-cs-catch-all ClassName] declares a generic canonical
 %  structure for the class projection on the structure on class ClassName,
 %  deferring the instanciation of the sort field to the elaborator.
 pred class-cs-catch-all i:classname.
 class-cs-catch-all ClassName :- std.do! [
-	coq.say "class cs",
   class-def (class ClassName S _),
   get-constructor S PackS,
   get-structure-class-projection S Sclass,
   coq.elpi.accumulate _ "cs.db" (clause _ _ (
-    pi ctx lhs rhs res params pparams sort partial ty\
+    pi ctx lhs rhs res params pparams sort ty\
 		cs ctx lhs rhs res :-
 		  if (lhs = app [Sclass | params]) true (lhs = Sclass, params = []),
 		  mk-app (global PackS) params pparams,
-		  mk-app pparams [sort, rhs] partial,
+		  mk-app pparams [sort, rhs] res,
 		  mk-app (global S) params ty,
-		  coq.elaborate-skeleton partial ty res ok)),
-		  coq.say "ok"].
+		  coq.typecheck res ty ok,
+		  solve-all-with res "done_tc"))].
 
 % [generic-body ClassName P T MLwA B] asserts
 %  B = fun c => Pack P T c
