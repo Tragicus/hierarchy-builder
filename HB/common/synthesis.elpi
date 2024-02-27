@@ -86,10 +86,10 @@ assert!-infer-mixin T M B :-
 
 % Given TheType it looks all canonical structure instances on it and makes
 % all their mixins available for inference
-pred under-local-canonical-mixins-of.do! i:term, i:list prop.
-under-local-canonical-mixins-of.do! T P :- std.do! [
+pred under-local-canonical-mixins-of.do! i:term, i:list term, i:list prop.
+under-local-canonical-mixins-of.do! T Params P :- std.do! [
   get-canonical-structures T CS,
-  std.map CS (private.structure-instance->mixin-srcs T) MSLL,
+  std.map CS (private.structure-instance->mixin-srcs T Params) MSLL,
   std.flatten MSLL MSL,
   MSL => std.do! P
 ].
@@ -266,31 +266,29 @@ instantiate-all-args-let F _ F ok.
 % Structure on TheType (if any) and builds mixin-src clauses for all the mixins
 % which can be candidates from that class instance. It finds instances which are
 % concrete, that is not by projecting a rich type (a variable) to its class.
-pred structure-instance->mixin-srcs i:term, i:structure, o:list prop.
-structure-instance->mixin-srcs T S MSLC :- std.do! [
+pred structure-instance->mixin-srcs i:term, i:list term i:structure, o:list prop.
+structure-instance->mixin-srcs T Params S MSLC :- std.do! [
   structure-key SortProj _ S,
   class-def (class (indt Class) S CMLwP),
-  structure-nparams S NParams,
-  coq.mk-n-holes NParams Holes,
-  std.append Holes [ST] HolesST,
-  coq.mk-app (global (const SortProj)) HolesST SortHolesST,
+  std.append Params [ST] ParamsST,
+  coq.mk-app (global (const SortProj)) ParamsST SortParamsST,
   % find an instance in ST
-  %coq.say "initial SortHolesST" SortHolesST,
-  coq.unify-eq T SortHolesST ok,
-  %coq.say "unified with T" T SortHolesST,
+  %coq.say "initial SortParamsST" SortParamsST,
+  coq.unify-eq T SortParamsST ok,
+  %coq.say "unified with T" T SortParamsST,
   % Should not unification infer the typeclasses?
-  coq.ltac.collect-goals SortHolesST GST [],
+  coq.ltac.collect-goals SortParamsST GST [],
   std.forall GST (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []),
-  %coq.say "final SortHolesST" SortHolesST,
+  %coq.say "final SortParamsST" SortParamsST,
   % we look for an instance which is concrete, we take the parts
   get-constructor S KS,
-  coq.mk-app (global KS) {std.append Holes [T, CT]} KSHolesC,
-  coq.unify-eq ST KSHolesC ok,
+  coq.mk-app (global KS) {std.append Params [T, CT]} KSParamsC,
+  coq.unify-eq ST KSParamsC ok,
   % if the class instance is concrete, we take the parts
   get-constructor (indt Class) KC,
   std.length {list-w-params_list CMLwP} CMixinsN,
   coq.mk-n-holes CMixinsN MIL,
-  coq.mk-app (global KC) {std.append Holes [T | MIL]} CBody,
+  coq.mk-app (global KC) {std.append Params [T | MIL]} CBody,
   coq.unify-eq CT CBody ok,
   % we finally generare micin-src clauses for all mixins
   std.map MIL (structure-instance->mixin-srcs.aux T) MSLL,
@@ -299,7 +297,7 @@ structure-instance->mixin-srcs T S MSLC :- std.do! [
 % this catch all sucks a bit, but is very relevant. Some instance, like
 % unification hints (canonical coercions) which require a type which is too rich
 % fail the second unif problem
-structure-instance->mixin-srcs _ _ [].
+structure-instance->mixin-srcs _ _ _ [].
 
 structure-instance->mixin-srcs.aux2 Params T Class (some P) M :-
   coq.mk-app (global (const P)) {std.append Params [T,Class]} M.
