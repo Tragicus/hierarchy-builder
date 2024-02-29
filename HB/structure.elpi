@@ -745,13 +745,13 @@ sort-cs-catch-all ClassName :- std.do! [
   get-structure-sort-projection S Ssort,
   coq.elpi.accumulate _ "cs.db" (clause _ _ (
     pi ctx lhs rhs res params paramsx cl ty\
-		cs ctx lhs rhs res :-
-		  if (lhs = app [Ssort | params]) true (lhs = Ssort, params = []),
+		cs ctx lhs rhs res :- std.spy-do![
+		  coq.safe-dest-app lhs Ssort params,
 		  std.append params [rhs, cl] paramsx,
 		  mk-app (global PackS) paramsx res,
 		  mk-app (global S) params ty,
 		  coq.typecheck res ty ok,
-		  solve-all-with res "done_tc"))].
+		  solve-all-with res "done_tc"]))].
 
 % [class-cs-catch-all ClassName] declares a generic canonical
 %  structure for the class projection on the structure on class ClassName,
@@ -764,7 +764,7 @@ class-cs-catch-all ClassName :- std.do! [
   coq.elpi.accumulate _ "cs.db" (clause _ _ (
     pi ctx lhs rhs res params pparams sort ty\
 		cs ctx lhs rhs res :-
-		  if (lhs = app [Sclass | params]) true (lhs = Sclass, params = []),
+		  coq.safe-dest-app lhs Sclass params,
 		  mk-app (global PackS) params pparams,
 		  mk-app pparams [sort, rhs] res,
 		  mk-app (global S) params ty,
