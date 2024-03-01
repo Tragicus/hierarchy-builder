@@ -75,6 +75,10 @@ declare Module BSkel Sort :- std.do! [
     log.coq.env.add-const-noimplicits "arg_sort" SortProjection SortProjTy ff ArgSortCst
   ),
 
+  if-verbose (coq.say {header} "declaring projections as canonical"),
+  class-def CurrentClass => private.sort-cs-catch-all ClassName,
+  class-def CurrentClass => private.class-cs-catch-all ClassName,
+
   if-verbose (coq.say {header} "start module Exports"),
 
   log.coq.env.begin-module "Exports" none,
@@ -327,7 +331,7 @@ mk-generic-coercion _ Structure Constructor Args Clause :-
 		coq.typecheck w wt ok,
 		coq.ltac.collect-goals c [g] [], !,
 		% TODO: fine tune the tactic below
-		coq.ltac.open (coq.ltac.call-ltac1 "assumption") g [], !,
+		coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g [], !,
 		r = w, !)).
 
 pred mk-coe-class-body
@@ -663,6 +667,42 @@ pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
   synthesis.infer-all-gref-deps PL T BuildC Class,
   mk-app (global PackS) {std.append PL [T, Class]} Body
 ].
+
+% [sort-cs-catch-all ClassName] declares a generic canonical
+%  structure for the sort projection on the structure on class ClassName,
+%  deferring the instanciation of the class field to typeclass resolution.
+pred sort-cs-catch-all i:classname.
+sort-cs-catch-all ClassName :- std.do! [
+  class-def (class ClassName S _),
+  get-constructor S PackS,
+  get-structure-sort-projection S Ssort,
+  coq.elpi.accumulate _ "cs.db" (clause _ _ (
+    pi ctx lhs rhs res params paramsx cl ty g\
+		cs ctx lhs rhs res :- std.do![
+		  coq.safe-dest-app lhs Ssort params,
+		  std.append params [rhs, cl] paramsx,
+		  mk-app (global PackS) paramsx res,
+		  mk-app (global S) params ty,
+		  coq.typecheck res ty ok,
+		  coq.ltac.collect-goals cl [g] [],
+		  coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []]))].
+
+% [class-cs-catch-all ClassName] declares a generic canonical
+%  structure for the class projection on the structure on class ClassName,
+%  deferring the instanciation of the sort field to the elaborator.
+pred class-cs-catch-all i:classname.
+class-cs-catch-all ClassName :- std.do! [
+  class-def (class ClassName S _),
+  get-constructor S PackS,
+  get-structure-class-projection S Sclass,
+  coq.elpi.accumulate _ "cs.db" (clause _ _ (
+    pi ctx lhs rhs res params args argsc ty\
+		cs ctx lhs rhs res :-
+		  coq.safe-dest-app lhs Sclass params,
+		  coq.typecheck rhs ty ok,
+		  coq.safe-dest-app ty (global ClassName) args,
+		  std.append args [rhs] argsc,
+		  mk-app (global PackS) argsc res))].
 
 pred mk-infer-key i:class, i:term, i:mixins, i:term, o:phant-term.
 mk-infer-key CoeClass K (w-params.nil ID _ _) St PhK :-
