@@ -127,6 +127,10 @@ declare Module BSkel Sort :- std.do! [
     ])
     (coq.say "declare:" ClassName "should be an inductive", fail),
 
+  coq.TC.declare-class ClassName,
+  ClassProjection = (global ClassP),
+  @global! => coq.TC.declare-instance ClassP 0,
+
   if-verbose (coq.say {header} "accumulating various props"),
   std.flatten [
       Factories, [ClassAlias], [is-structure Structure],
