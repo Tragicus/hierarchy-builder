@@ -125,14 +125,13 @@ declare Module BSkel Sort :- std.do! [
   %]),
 
   if-verbose (coq.say {header} "making coercion from type to target"),
-	if (synthesis.infer-coercion-tgt MLwP CoeClass)
-	 (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
+  if (synthesis.infer-coercion-tgt MLwP CoeClass)
+    (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
     private.declare-sort-coercion CoeClass Structure SortProjection)
-    (if-arg-sort (private.declare-sort-coercion-elpi Structure
-      (global (const ArgSortCst))),
-    private.declare-sort-coercion-elpi Structure SortProjection),
+	 (if-arg-sort (private.declare-sort-coercion-elpi (global Structure) (global (const ArgSortCst))),
+    private.declare-sort-coercion-elpi (global Structure) SortProjection),
 
-  %private.declare-generic-coercion-elpi Structure,
+  private.declare-generic-coercion-elpi Structure,
 
   if-verbose (coq.say {header} "exporting unification hints"),
   ClassAlias => Factories => GRDepsClauses =>
@@ -303,33 +302,24 @@ export-operations Structure ProjSort ProjClass MLwP EX1 EX2 MLToExport :- std.do
   std.map LMwPToExport w-params_1 MLToExport,
 ].
 
-pred mk-sort-coercion-aux i:term, i:structure, i:term, i:list term, o:prop.
+pred mk-sort-coercion-aux i:term, i:term, i:term, i:list term, o:prop.
 mk-sort-coercion-aux (prod _N _T Body) Structure P Args Clause :-
   Clause = (pi x\ C x),
   pi x\ mk-sort-coercion-aux (Body x) Structure P [x | Args] (C x).
 
-mk-sort-coercion-aux _ Structure P Args (pi v\ Clause v) :-
-  get-constructor Structure Pack,
+mk-sort-coercion-aux _ Structure P Args Clause :-
   std.rev Args ArgsRev,
-  mk-app (global Structure) ArgsRev SArgs,
-  std.length Args NArgs,
-  pi v\ sigma argsAll\ (
-    std.append ArgsRev [v] argsAll,
-    if (P = primitive _)
-      (Clause v =
-        (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
-          if (v = app [global Pack|vargs]) (std.nth NArgs vargs w)
-            (w = app [P, v]),
-          coq.elaborate-skeleton w e r ok)))
-      (Clause v =
-        (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
-          if (v = app [global Pack|vargs]) (std.nth NArgs vargs w)
-            (mk-app P argsAll w),
-          coq.elaborate-skeleton w e r ok)))).
+  Clause =
+    (pi ctx v t e r argsAll w\ (coercion ctx v t e r :-
+      coq.unify-eq t (app [Structure | ArgsRev]) ok,
+      std.append ArgsRev [v] argsAll,
+      mk-app P argsAll w,
+      coq.elaborate-skeleton w e r ok,
+      coq.ltac.collect-goals r [] [])).
 
-pred mk-sort-coercion i:structure, i:term, o:prop.
+pred mk-sort-coercion i:term, i:term, o:prop.
 mk-sort-coercion Structure P Clause :-
-  coq.typecheck (global Structure) T ok,
+  coq.typecheck Structure T ok,
   mk-sort-coercion-aux T Structure P [] Clause.
 
 pred mk-generic-coercion i:term, i:term, i:term, i:list term, o:prop.
@@ -340,16 +330,21 @@ mk-generic-coercion _ Structure Constructor Args Clause :-
   std.rev Args ArgsRev,
   mk-app Constructor ArgsRev Cargs,
   mk-app Structure ArgsRev Sargs,
+  % N.B. Iwould like to introduce the type of the class in the following typecheck and use it
+  % to avoid the next typecheck.
+  coq.typecheck Cargs (prod _ Tv _) ok,
   Clause =
-    (pi ctx v t e r c w wt g g'\ (coercion ctx v t Sargs r :-
+    (pi ctx v t e r c w wt g\ (coercion ctx v t e r :-
+      coq.unify-eq e Sargs ok,
+		coq.unify-eq t Tv ok, !,
 		% N.B. I have to *not* use r here, otherwise elpi instanciates r temporarily with "app X", which
 		% fails because r is typechecked immediately and "app X" does not typecheck.
       mk-app Cargs [v, c] w, !,
-		  coq.typecheck w wt ok,
-      coq.ltac.collect-goals c [g] [], !,
-      % TODO: fine tune the tactic below
-      coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g g', !,
-      r = w, !)).
+		coq.typecheck w wt ok,
+		coq.ltac.collect-goals c [g] [], !,
+		% TODO: fine tune the tactic below
+		coq.ltac.open (coq.ltac.call-ltac1 "assumption") g [], !,
+		r = w, !)).
 
 pred mk-coe-class-body
   i:factoryname, % From class
@@ -626,7 +621,7 @@ declare-sort-coercion CoeClass StructureName (global Proj) :-
   log.coq.coercion.declare (coercion Proj 0 StructureName CoeClass).
 
 % Declares "sort" as a Coercion in elpi's coercion db Proj : Structurename >-> CoeClass.
-pred declare-sort-coercion-elpi i:structure, i:term.
+pred declare-sort-coercion-elpi i:term, i:term.
 declare-sort-coercion-elpi Structure Proj :-
 
   if-verbose (coq.say {header} "declare sort coercion in elpi"),
