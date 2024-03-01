@@ -105,10 +105,14 @@ declare Module BSkel Sort :- std.do! [
   %]),
 
   if-verbose (coq.say {header} "making coercion from type to target"),
-  synthesis.infer-coercion-tgt MLwP CoeClass,
-  if-arg-sort (private.declare-sort-coercion CoeClass Structure
-    (global (const ArgSortCst))),
-  private.declare-sort-coercion CoeClass Structure SortProjection,
+  if (synthesis.infer-coercion-tgt MLwP CoeClass)
+    (if-arg-sort (private.declare-sort-coercion CoeClass Structure
+      (global (const ArgSortCst))),
+    private.declare-sort-coercion CoeClass Structure SortProjection)
+	 (if-arg-sort (private.declare-sort-coercion-elpi (global Structure) (global (const ArgSortCst))),
+    private.declare-sort-coercion-elpi (global Structure) SortProjection),
+
+  private.declare-generic-coercion-elpi Structure,
 
   if-verbose (coq.say {header} "exporting unification hints"),
   ClassAlias => Factories => GRDepsClauses =>
@@ -137,24 +141,26 @@ declare Module BSkel Sort :- std.do! [
 
   log.coq.env.import-module "Exports" Exports,
 
-  if-verbose (coq.say {header} "declaring on_ abbreviation"),
+  if (var CoeClass)
+    (if-verbose (coq.say {header} "could not declare the `on_`, `copy` and `on` abbreviations because the target of sort is not a coercion class"))
+    (if-verbose (coq.say {header} "declaring on_ abbreviation"),
 
-  private.mk-infer-key CoeClass ClassProjection NilwP (global Structure) PhClass,
+    private.mk-infer-key CoeClass ClassProjection NilwP (global Structure) PhClass,
 
-  phant.add-abbreviation "on_" PhClass _ ClassOfAbbrev,
-  (pi c\ coq.notation.abbreviation ClassOfAbbrev [c] (ClassOfAbbrev_ c)),
+    phant.add-abbreviation "on_" PhClass _ ClassOfAbbrev,
+    (pi c\ coq.notation.abbreviation ClassOfAbbrev [c] (ClassOfAbbrev_ c)),
 
-  if-verbose (coq.say {header} "declaring `copy` abbreviation"),
+    if-verbose (coq.say {header} "declaring `copy` abbreviation"),
 
-  coq.mk-app (global ClassName) {params->holes NilwP} AppClassHoles,
-  @global! => log.coq.notation.add-abbreviation "copy" 2
-    {{fun T C => (lp:(ClassOfAbbrev_ C) : (lp:AppClassHoles T)) }} tt _,
+    coq.mk-app (global ClassName) {params->holes NilwP} AppClassHoles,
+    @global! => log.coq.notation.add-abbreviation "copy" 2
+      {{fun T C => (lp:(ClassOfAbbrev_ C) : (lp:AppClassHoles T)) }} tt _,
 
-  if-verbose (coq.say {header} "declaring on abbreviation"),
+    if-verbose (coq.say {header} "declaring on abbreviation"),
 
-  @global! => log.coq.notation.add-abbreviation "on" 1
-    {{fun T => (lp:{{ ClassOfAbbrev_ {{_}} }} : (lp:AppClassHoles T)) }} tt
-    _OnAbbrev,
+    @global! => log.coq.notation.add-abbreviation "on" 1
+      {{fun T => (lp:{{ ClassOfAbbrev_ {{_}} }} : (lp:AppClassHoles T)) }} tt
+      _OnAbbrev),
 
   log.coq.env.end-module-name Module ModulePath,
 
@@ -275,6 +281,50 @@ export-operations Structure ProjSort ProjClass MLwP EX1 EX2 MLToExport :- std.do
   std.fold LMwPToExport EX1 (export-operations.aux Structure ProjSort ProjClass) EX2,
   std.map LMwPToExport w-params_1 MLToExport,
 ].
+
+pred mk-sort-coercion-aux i:term, i:term, i:term, i:list term, o:prop.
+mk-sort-coercion-aux (prod _N _T Body) Structure P Args Clause :-
+  Clause = (pi x\ C x),
+  pi x\ mk-sort-coercion-aux (Body x) Structure P [x | Args] (C x).
+
+mk-sort-coercion-aux _ Structure P Args Clause :-
+  std.rev Args ArgsRev,
+  Clause =
+    (pi ctx v t e r argsAll w\ (coercion ctx v t e r :-
+      coq.unify-eq t (app [Structure | ArgsRev]) ok,
+      std.append ArgsRev [v] argsAll,
+      mk-app P argsAll w,
+      coq.elaborate-skeleton w e r ok,
+      coq.ltac.collect-goals r [] [])).
+
+pred mk-sort-coercion i:term, i:term, o:prop.
+mk-sort-coercion Structure P Clause :-
+  coq.typecheck Structure T ok,
+  mk-sort-coercion-aux T Structure P [] Clause.
+
+pred mk-generic-coercion i:term, i:term, i:term, i:list term, o:prop.
+mk-generic-coercion (prod N T Body) Structure Constructor Args (pi x\ C x) :-
+  @pi-decl N T x\ mk-generic-coercion (Body x) Structure Constructor [x | Args] (C x).
+
+mk-generic-coercion _ Structure Constructor Args Clause :-
+  std.rev Args ArgsRev,
+  mk-app Constructor ArgsRev Cargs,
+  mk-app Structure ArgsRev Sargs,
+  % N.B. Iwould like to introduce the type of the class in the following typecheck and use it
+  % to avoid the next typecheck.
+  coq.typecheck Cargs (prod _ Tv _) ok,
+  Clause =
+    (pi ctx v t e r c w wt g\ (coercion ctx v t e r :-
+      coq.unify-eq e Sargs ok,
+		coq.unify-eq t Tv ok, !,
+		% N.B. I have to *not* use r here, otherwise elpi instanciates r temporarily with "app X", which
+		% fails because r is typechecked immediately and "app X" does not typecheck.
+      mk-app Cargs [v, c] w, !,
+		coq.typecheck w wt ok,
+		coq.ltac.collect-goals c [g] [], !,
+		% TODO: fine tune the tactic below
+		coq.ltac.open (coq.ltac.call-ltac1 "assumption") g [], !,
+		r = w, !)).
 
 pred mk-coe-class-body
   i:factoryname, % From class
@@ -494,6 +544,28 @@ declare-sort-coercion CoeClass StructureName (global Proj) :-
   if-verbose (coq.say {header} "declare sort coercion"),
 
   log.coq.coercion.declare (coercion Proj 0 StructureName CoeClass).
+
+% Declares "sort" as a Coercion in elpi's coercion db Proj : Structurename >-> CoeClass.
+pred declare-sort-coercion-elpi i:term, i:term.
+declare-sort-coercion-elpi Structure Proj :-
+
+  if-verbose (coq.say {header} "declare sort coercion in elpi"),
+
+  %TODO: log.coq.coercion-elpi.declare 
+  mk-sort-coercion Structure Proj Clause,
+  coq.elpi.accumulate _ "coercion.db" (clause _ _ Clause).
+
+% Declares "Pack" as a Coercion in elpi's coercion db
+pred declare-generic-coercion-elpi i:gref.
+declare-generic-coercion-elpi S :-
+  get-constructor S PackS,
+  coq.typecheck (global S) T ok,
+  mk-generic-coercion T (global S) (global PackS) [] Clause,
+
+  if-verbose (coq.say {header} "declare `Pack` as a coercion in elpi"),
+
+  %TODO: log.coq.coercion-elpi.declare 
+  coq.elpi.accumulate _ "coercion.db" (clause _ _ Clause).
 
 pred if-class-already-exists-error i:id, i:list class, i:list mixinname.
 if-class-already-exists-error _ [] _.
