@@ -107,7 +107,7 @@ declare-all T [class Class Struct MLwP|Rest] [pr Name CS|L] :-
 
   !,
 
-  decl-const-in-struct Name S STy CS,
+  decl-const-in-struct Class Name S STy CS,
 
   Clauses => declare-all T Rest L.
 
@@ -135,7 +135,7 @@ declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS|L]
   abstract-holes.main S SC,
   std.assert-ok! (coq.typecheck SC SCTy) "declare-all-on-type-constructor: badly closed",
   
-  decl-const-in-struct Name SC SCTy CS,
+  decl-const-in-struct Class Name SC SCTy CS,
 
   Clauses => declare-all-on-type-constructor TK Rest L.
 
@@ -153,7 +153,7 @@ has-instance T Struct :-
      fail. % we build it
 
 pred infer-class i:term, i:classname, i:gref, i:factories, o:term, o:string, o:term, o:list prop.
-infer-class T  Class Struct MLwP S Name STy Clauses:- std.do![
+infer-class T Class Struct MLwP S Name STy Clauses:- std.do![
 
   params->holes MLwP Params,
   get-constructor Class KC,
@@ -165,27 +165,23 @@ infer-class T  Class Struct MLwP S Name STy Clauses:- std.do![
   Name is {cs-pattern->name {term->cs-pattern T}}
     ^ "__canonical__" ^ {gref->modname Struct 2 "_" },
 
-  if-verbose (coq.say {header} "declare canonical structure instance" Name),
+  if-verbose (coq.say {header} "declare instance" Name),
 
-  get-constructor Struct KS,
   coq.safe-dest-app T THD _,
-  private.optimize-class-body THD {std.length Params} KCApp KCAppNames Clauses,
-  coq.mk-app (global KS) {std.append Params [T, KCAppNames]} S,
+  private.optimize-class-body THD {std.length Params} KCApp S Clauses,
   if-verbose (coq.say {header} "structure instance for" Name "is" {coq.term->string S}),
 
   coq.typecheck S STy ok, % failure may be due to a parameter not rich enough see #435
      
 ].
 
-pred decl-const-in-struct i:string, i:term, i:term, i:constant.
-decl-const-in-struct Name S STy CS:- std.do![
-
-  if (ground_term S) (S1 = S, STy1 = STy)
-    (abstract-holes.main S S1,
-     std.assert-ok! (coq.typecheck S1 STy1) "HB: structure instance illtyped after generalizing over holes"),
-
-  log.coq.env.add-const-noimplicits Name S1 STy1 @transparent! CS, % Bug coq/coq#11155, could be a Let
-  with-locality (log.coq.CS.declare-instance CS), % Bug coq/coq#11155, should be local
+pred decl-const-in-struct i:gref, i:string, i:term, i:term, i:constant.
+decl-const-in-struct Class Name S STy CS:- std.do![
+  log.coq.env.add-const-noimplicits Name S STy @transparent! CS, % Bug coq/coq#11155, could be a Let
+  % TODO: fine tune the instance priority, I do not see the API for that now.
+  coq.TC.get-inst-prio Class (const CS) Prio,
+  if (Prio = tc-priority-given N) (true) (Prio = tc-priority-computed N),
+  with-locality (coq.TC.declare-instance (const CS) N), % Bug coq/coq#11155, should be local
   acc-clause current (local-canonical CS),
   if-verbose (coq.say {header} "structure instance" Name "declared"),
 ].
