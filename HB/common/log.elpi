@@ -168,12 +168,30 @@ coercion.declare C :- std.do! [
 
 }
 
+pred log.coq.CS.declare-instance.under-lambdas i:term i:constant.
+log.coq.CS.declare-instance.under-lambdas (fun N T Body) C :-
+  @pi-decl N T x\ log.coq.CS.declare-instance.under-lambdas (Body x) C.
+log.coq.CS.declare-instance.under-lambdas X C :- std.do![
+  coq.safe-dest-app X Constructor Args,
+  coq.typecheck Constructor T ok,
+  coq.prod-tgt->gref T (indt Struct),
+  coq.env.indt Struct _ NParams _ _ _ _,
+  std.nth NParams Args Subject,
+  term->cs-pattern Subject Pat,
+  std.forall {coq.env.projections Struct} (p\ 
+    if (p = some Proj)
+      (coq.elpi.accumulate _ "cs.db" (clause _ _ (canonical-structure (const Proj) Pat (global (const C)))))
+		true)].
+
 % Since CS.foo is not a valid predicate name we can't use it
 % in the namespace, so we just define it here with the full name
 pred log.coq.CS.declare-instance i:constant.
-log.coq.CS.declare-instance C  :- std.do! [
+log.coq.CS.declare-instance C :- std.do! [
   if (@local!) (Local = tt) (Local = ff),
-  coq.CS.declare-instance (const C),
+  coq.redflags.add coq.redflags.betaiotazeta
+    [coq.redflags.delta, coq.redflags.const C] Redflags,
+  @redflags! Redflags => coq.reduction.lazy.whd (global (const C)) X,
+  log.coq.CS.declare-instance.under-lambdas X C,
   coq.gref->id (const C) Id,
   std.last {coq.gref->path (const C)} M,
   std.last {coq.env.current-path} M1,

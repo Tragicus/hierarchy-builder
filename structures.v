@@ -251,6 +251,32 @@ pred docstring o:loc, o:string.
     or inductive was generated.
 *)
 
+Elpi Accumulate cs.db lp:{{
+% TODO: very bad, to be backported to stdlib, duplicate of stdpp.elpi
+pred coq.term-is-gref? i:term, o:gref.
+coq.term-is-gref? (global GR) GR :- !.
+coq.term-is-gref? (pglobal GR _) GR :- !.
+coq.term-is-gref? (app [Hd|_]) GR :- !, coq.term-is-gref? Hd GR.
+coq.term-is-gref? (let _ _ T x\x) GR :- !, coq.term-is-gref? T GR.
+
+pred term->cs-pattern i:term, o:cs-pattern.
+term->cs-pattern (prod _ _ _) cs-prod :- !.
+term->cs-pattern (sort U) (cs-sort U) :- !.
+term->cs-pattern (fun N T Body) Pat :-
+  @pi-decl N T x\ term->cs-pattern (Body x) Pat.
+term->cs-pattern T (cs-gref GR) :- coq.term-is-gref? T GR, !.
+term->cs-pattern _ cs-default.
+
+% database of canonical structures
+pred canonical-structure o:gref, o:cs-pattern, o:term.
+
+cs _Ctx Proj Rhs Sol :- !, std.do![
+  coq.safe-dest-app Proj Head _,
+  term->cs-pattern Rhs Pat,
+  canonical-structure {coq.term->gref Head} Pat Sol].
+}}.
+Elpi Typecheck.
+
 #[arguments(raw)] Elpi Command HB.locate.
 Elpi Accumulate Db hb.db.
 (* Since it can become rather large, accumulating the DB is often by far the
@@ -286,6 +312,7 @@ Elpi Export HB.locate.
 *)
 
 #[arguments(raw)] Elpi Command HB.about.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -320,6 +347,7 @@ Elpi Export HB.about.
 *)
 
 #[arguments(raw)] Elpi Command HB.howto.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -391,6 +419,7 @@ tred file.dot | xdot -
 *)
 
 #[arguments(raw)] Elpi Command HB.graph.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -440,6 +469,7 @@ HB.mixin Record MixinName T of Factory1 T & … & FactoryN T := {
 *)
 
 #[arguments(raw)] Elpi Command HB.mixin.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -522,6 +552,7 @@ Elpi Export HB.mixin.
 *)
 
 Elpi Tactic HB.pack_for.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -545,6 +576,7 @@ Elpi Typecheck.
 Elpi Export HB.pack_for.
 
 Elpi Tactic HB.pack.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -705,6 +737,7 @@ Elpi Export HB.structure.
 *)
 
 #[arguments(raw)] Elpi Command HB.saturate.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -752,6 +785,7 @@ HB.instance Definition N Params := Factory.Build Params T …
 *)
 
 #[arguments(raw)] Elpi Command HB.instance.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -794,6 +828,7 @@ Elpi Export HB.instance.
 (** [HB.factory] declares a factory. It has the same syntax of [HB.mixin] *)
 
 #[arguments(raw)] Elpi Command HB.factory.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -877,6 +912,7 @@ HB.end.
 *)
 
 #[arguments(raw)] Elpi Command HB.builders.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -918,6 +954,7 @@ Elpi Export HB.builders.
 
 
 #[arguments(raw)] Elpi Command HB.end.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -992,6 +1029,7 @@ Export Algebra.Exports.
 *)
 
 #[arguments(raw)] Elpi Command HB.export.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -1038,6 +1076,7 @@ Elpi Export HB.export.
    (a module which is not closed yet) *)
 
 #[arguments(raw)] Elpi Command HB.reexport.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -1121,6 +1160,7 @@ HB.instance Definition _ : Ml ... T := ml.
 *)
 
 #[arguments(raw)] Elpi Command HB.declare.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -1157,6 +1197,7 @@ Elpi Export HB.declare.
     [#[fail]] attribute. *)
 
 #[arguments(raw)] Elpi Command HB.check.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".

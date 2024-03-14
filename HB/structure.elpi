@@ -76,7 +76,6 @@ declare Module BSkel Sort :- std.do! [
   ),
 
   if-verbose (coq.say {header} "declaring projections as canonical"),
-  class-def CurrentClass => private.sort-cs-catch-all ClassName,
   class-def CurrentClass => private.class-cs-catch-all ClassName,
 
   if-verbose (coq.say {header} "start module Exports"),
@@ -667,25 +666,6 @@ pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
   synthesis.infer-all-gref-deps PL T BuildC Class,
   mk-app (global PackS) {std.append PL [T, Class]} Body
 ].
-
-% [sort-cs-catch-all ClassName] declares a generic canonical
-%  structure for the sort projection on the structure on class ClassName,
-%  deferring the instanciation of the class field to typeclass resolution.
-pred sort-cs-catch-all i:classname.
-sort-cs-catch-all ClassName :- std.do! [
-  class-def (class ClassName S _),
-  get-constructor S PackS,
-  get-structure-sort-projection S Ssort,
-  coq.elpi.accumulate _ "cs.db" (clause _ _ (
-    pi ctx lhs rhs res params paramsx cl ty g\
-		cs ctx lhs rhs res :- std.do![
-		  coq.safe-dest-app lhs Ssort params,
-		  std.append params [rhs, cl] paramsx,
-		  mk-app (global PackS) paramsx res,
-		  mk-app (global S) params ty,
-		  coq.typecheck res ty ok,
-		  coq.ltac.collect-goals cl [g] [],
-		  coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []]))].
 
 % [class-cs-catch-all ClassName] declares a generic canonical
 %  structure for the class projection on the structure on class ClassName,
