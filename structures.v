@@ -272,11 +272,8 @@ term->cs-pattern _ cs-default.
 pred canonical-instance o:gref, o:cs-pattern, o:gref.
 
 cs _Ctx Proj Rhs Sol :- !, std.do![
-  coq.say "cs lookup db",
   coq.safe-dest-app Proj Head _,
-  coq.say "got Head" Head,
   term->cs-pattern Rhs Pat,
-  coq.say "got Pat" Pat,
   canonical-instance {coq.term->gref Head} Pat SolGR,
   coq.env.global SolGR Sol].
 }}.

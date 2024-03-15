@@ -47,7 +47,7 @@ export.reexport-all-modules-and-CS Filter :- std.do! [
   std.map InstCLFiltered instance-to-export_instance Insts,
 
   if-verbose (coq.say {header} "exporting CS instances" Insts),
-  std.forall Insts log.coq.CS.declare-instance,
+  std.map Insts log.coq.CS.declare-instance _,
 
   std.findall (abbrev-to-export File NiceAbbrev_ GR_) InstAbbL,
   std.filter {std.list-uniq InstAbbL} (export.private.abbrev-in-module MFilter) InstAbbLFiltered,
