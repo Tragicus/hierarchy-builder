@@ -411,17 +411,24 @@ has-mixin-instance->mixin-src (has-mixin-instance _ M IHd) C :- std.do![
   mixin-instance-type->mixin-src Ty M T [] C,
 ].
 
+pred canonical-instance->cs-instance i:prop, o:cs-instance.
+canonical-instance->cs-instance (canonical-instance X P C) (cs-instance X P C).
+
+pred coq.canonical-structure.db-for i:gref, i:cs-pattern, o:list cs-instance.
+coq.canonical-structure.db-for X P S :-
+  std.map {std.findall (canonical-instance X P _)} canonical-instance->cs-instance S.
+
 pred get-canonical-structures i:term, o:list structure.
 get-canonical-structures TyTrm StructL :- std.do! [
   term->cs-pattern TyTrm Pat, !,
-  coq.CS.db-for _ Pat DBGTyL,
+  coq.canonical-structure.db-for _ Pat DBGTyL,
   std.map-filter DBGTyL get-cs-structure StructL,
 ].
 
 pred get-canonical-instances i:term, o:list constant.
 get-canonical-instances TyTrm StructL :- std.do! [
   term->cs-pattern TyTrm Pat, !,
-  coq.CS.db-for _ Pat DBGTyL,
+  coq.canonical-structure.db-for _ Pat DBGTyL,
   std.map-filter DBGTyL get-cs-instance StructL,
 ].
 
@@ -429,7 +436,7 @@ pred has-CS-instance? i:term, i:structure.
 has-CS-instance? TyTerm (indt Struct) :- std.do! [
   term->cs-pattern TyTerm Pat,
   coq.env.projections Struct [some Proj, _],
-  coq.CS.db-for (const Proj) Pat L,
+  coq.canonical-structure.db-for (const Proj) Pat L,
   not(L = [])
 ].
 

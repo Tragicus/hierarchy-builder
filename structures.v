@@ -268,12 +268,17 @@ term->cs-pattern T (cs-gref GR) :- coq.term-is-gref? T GR, !.
 term->cs-pattern _ cs-default.
 
 % database of canonical structures
-pred canonical-structure o:gref, o:cs-pattern, o:term.
+:index (3 4 0)
+pred canonical-instance o:gref, o:cs-pattern, o:gref.
 
 cs _Ctx Proj Rhs Sol :- !, std.do![
+  coq.say "cs lookup db",
   coq.safe-dest-app Proj Head _,
+  coq.say "got Head" Head,
   term->cs-pattern Rhs Pat,
-  canonical-structure {coq.term->gref Head} Pat Sol].
+  coq.say "got Pat" Pat,
+  canonical-instance {coq.term->gref Head} Pat SolGR,
+  coq.env.global SolGR Sol].
 }}.
 Elpi Typecheck.
 
@@ -381,6 +386,30 @@ Elpi Typecheck.
 Elpi Export HB.howto.
 
 
+
+(* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
+(* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
+(* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
+
+(** This command prints the table of canonical instances.
+
+*)
+
+#[arguments(raw)] Elpi Command HB.canonical_instances.
+Elpi Accumulate Db cs.db.
+Elpi Accumulate lp:{{
+
+:name "start"
+main [] :- !, std.findall (canonical-instance _ _ _) R,
+  coq.say R.
+
+main _ :- coq.error "Usage: HB.canonical_instances.".
+}}.
+Elpi Typecheck.
+Elpi Export HB.canonical_instances.
+
+
+
 (* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
 (* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
 (* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
@@ -391,6 +420,7 @@ Elpi Export HB.howto.
 
 #[arguments(raw)] Elpi Command HB.status.
 Elpi Accumulate Db hb.db.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 #[skip="8.1[56].*"] Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".

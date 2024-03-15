@@ -79,7 +79,7 @@ lexi-order [X|T1] [X|T2] :- lexi-order T1 T2.
 % [structures-on-gref GR ML] list structures [GR] is equipped with
 pred structures-on-gref i:gref, o:list structure.
 structures-on-gref GR SL :-
-  std.filter {coq.CS.db-for _ (cs-gref GR)} (about.not1 about.unif-hint?) LV,
+  std.filter {coq.canonical-structure.db-for _ (cs-gref GR)} (about.not1 about.unif-hint?) LV,
   std.map LV structures-on-gref.aux SL.
 structures-on-gref.aux (cs-instance _ _ GR) F :-
   coq.prod-tgt->gref {coq.env.typeof GR} F, class-def (class _ F _).

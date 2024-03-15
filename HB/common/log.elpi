@@ -180,7 +180,7 @@ log.coq.CS.declare-instance.under-lambdas X C :- std.do![
   term->cs-pattern Subject Pat,
   std.forall {coq.env.projections Struct} (p\ 
     if (p = some Proj)
-      (coq.elpi.accumulate _ "cs.db" (clause _ _ (canonical-structure (const Proj) Pat (global (const C)))))
+      (coq.elpi.accumulate _ "cs.db" (clause _ _ (canonical-instance (const Proj) Pat (const C))))
 		true)].
 
 % Since CS.foo is not a valid predicate name we can't use it
@@ -188,9 +188,7 @@ log.coq.CS.declare-instance.under-lambdas X C :- std.do![
 pred log.coq.CS.declare-instance i:constant.
 log.coq.CS.declare-instance C :- std.do! [
   if (@local!) (Local = tt) (Local = ff),
-  coq.redflags.add coq.redflags.betaiotazeta
-    [coq.redflags.delta, coq.redflags.const C] Redflags,
-  @redflags! Redflags => coq.reduction.lazy.whd (global (const C)) X,
+  coq.reduction.lazy.whd (global (const C)) X,
   log.coq.CS.declare-instance.under-lambdas X C,
   coq.gref->id (const C) Id,
   std.last {coq.gref->path (const C)} M,

@@ -246,7 +246,7 @@ saturate-instances :- std.do! [
 pred no-instance-for i:cs-pattern, i:class.
 no-instance-for K (class _ S _) :-
   get-structure-sort-projection S (global Proj),
-  coq.CS.db-for Proj K [].
+  coq.canonical-structure.db-for Proj K [].
 
 /* ------------------------------------------------------------------------- */
 /* ----------------------------- private code ------------------------------ */

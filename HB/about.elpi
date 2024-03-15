@@ -45,8 +45,8 @@ main-located S (loc-gref GR) :- from Factory Mixin GR, !,
   private.main-builder S Factory Mixin.
 
 main-located S (loc-gref GR) :-
-  std.filter {coq.CS.db-for _ (cs-gref GR)} (not1 unif-hint?) LV,
-  coq.CS.db-for GR _ LP,
+  std.filter {coq.canonical-structure.db-for _ (cs-gref GR)} (not1 unif-hint?) LV,
+  coq.canonical-structure.db-for GR _ LP,
   std.filter {coq.coercion.db} (c\c = coercion GR _ _ _) LC,
   if (LV = [], LP = [], LC = [])
      (coq.error "HB: uninteresting constant" {coq.pp->string {private.pp-loc-of GR}})
@@ -75,7 +75,7 @@ pred pp-module i:gref, o:coq.pp.
 pp-module GR (str ID) :- gref->modname_short GR "." ID.
 
 pred unif-hint? i:cs-instance.
-unif-hint? (cs-instance _ (cs-gref GR) _) :- coq.CS.db-for GR _ [_|_].
+unif-hint? (cs-instance _ (cs-gref GR) _) :- coq.canonical-structure.db-for GR _ [_|_].
 
 pred not1 i:(A -> prop), i:A.
 not1 P X :- not (P X).
