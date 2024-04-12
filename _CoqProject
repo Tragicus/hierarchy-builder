@@ -1,3 +1,12 @@
+-generate-meta-for-package coq-hierarchy-builder
+-I src
+
+src/utils.mli
+src/utils.ml
+src/factory.mli
+src/factory.ml
+src/vernac.mlg
+src/hierarchy_builder.mlpack
 structures.v
 -arg -w -arg -elpi.accumulate-syntax
 -arg -w -arg +elpi.typecheck

@@ -1,3 +1,5 @@
+Declare ML Module "hierarchy_builder:coq-hierarchy-builder.plugin".
+
 (* Support constants, to be kept in sync with shim/structures.v *)
 From Coq Require Import String ssreflect ssrfun.
 Export String.StringSyntax.

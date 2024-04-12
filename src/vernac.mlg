@@ -1,0 +1,66 @@
+(*i camlp4deps: "parsing/grammar.cma" i*)
+(*i camlp4use: "pa_extend.cmo" i*)
+
+DECLARE PLUGIN "coq-hierarchy-builder.plugin"
+
+{
+
+open Ltac_plugin
+
+open Pcoq.Prim
+open Pvernac.Vernac_
+
+let def_body = G_vernac.def_body
+
+let preprocess_record ~atts kind id =
+  match Vernacentries.preprocess_inductive_decl ~atts Vernacexpr.Record [id] with
+  | Vernacentries.Preprocessed_Mind_decl.Inductive _ -> assert false
+  | Vernacentries.Preprocessed_Mind_decl.Record r -> r
+
+let preprocess_definition ~loc ~atts id def =
+  match def with
+  | Vernacexpr.DefineBody (bl, red, c, ty) -> (snd id, atts, bl, red, c, ty)
+  | _ -> CErrors.user_err ~loc Pp.(str "syntax error: missing Definition body")
+
+}
+
+ARGUMENT EXTEND attribute
+END
+
+ARGUMENT EXTEND attribute_list
+PRINTED BY { fun _ _ _ atts -> Pp.(prlist_with_sep (fun () -> str ",") Attributes.pr_vernac_flag atts) } 
+END
+
+ARGUMENT EXTEND record
+PRINTED BY { fun _ _ _ _ -> Pp.str "TODO: pr_record" }
+INTERPRETED BY { fun ist env evd x -> ist, x }
+GLOBALIZED BY { fun glob_sign x -> glob_sign, x }
+SUBSTITUTED BY { fun _ _ -> CErrors.anomaly Pp.(str "command arguments should not be substituted") }
+RAW_PRINTED BY { fun _ _ _ _ -> Pp.str "TODO: pr_raw_record" }
+GLOB_PRINTED BY { fun _ _ _ _ -> Pp.str "TODO: pr_glob_record" }
+| [ "Record" inductive_or_record_definition(id) ] -> { preprocess_record ~atts:[] Vernacexpr.Record id }
+| [ "#[" attribute_list(atts) "]" "Record" inductive_or_record_definition(id) ] -> { preprocess_record ~atts Vernacexpr.Record id }
+| [ "Class" inductive_or_record_definition(id) ] -> { preprocess_record ~atts:[] Vernacexpr.(Class true) id }
+| [ "#[" attribute_list(atts) "]" "Class" inductive_or_record_definition(id) ] -> { preprocess_record ~atts Vernacexpr.(Class true) id }
+| [ "Structure" inductive_or_record_definition(id) ] -> { preprocess_record ~atts:[] Vernacexpr.Structure id }
+| [ "#[" attribute_list(atts) "]" "Structure" inductive_or_record_definition(id) ] -> { preprocess_record ~atts Vernacexpr.Structure id }
+END
+
+ARGUMENT EXTEND definition
+PRINTED BY { fun _ _ _ _ -> Pp.str "TODO: pr_definition" }
+INTERPRETED BY { fun ist env evd x -> ist, x }
+GLOBALIZED BY { fun glob_sign x -> glob_sign, x }
+SUBSTITUTED BY { fun _ _ -> CErrors.anomaly Pp.(str "command arguments should not be substituted") }
+RAW_PRINTED BY { fun _ _ _ _ -> Pp.str "TODO: pr_rew_definition" }
+GLOB_PRINTED BY { fun _ _ _ _ -> Pp.str "TODO: pr_glob_definition" }
+| [ "Definition" ident_decl(id) def_body(b) ] -> { preprocess_definition ~loc ~atts:[] id b }
+| [ "#[" attribute_list(atts) "]" "Definition" ident_decl(id) def_body(b) ] -> { preprocess_definition ~loc ~atts id b }
+END
+
+
+
+VERNAC COMMAND EXTEND TOTO CLASSIFIED AS SIDEFF
+| [ "HB_factory" record(r) ] SYNTERP AS states { Factory.synterp_declare_factory_of_record [] r } -> { Factory.declare_factory_of_record states r }
+
+END
+
