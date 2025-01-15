@@ -67,6 +67,10 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
+  (class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
+  if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
+	log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
+
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
     std.assert-ok! (coq.typecheck SortProjection SortProjTy)
@@ -74,13 +78,12 @@ declare Module BSkel Sort :- std.do! [
     log.coq.env.add-const-noimplicits "arg_sort" SortProjection SortProjTy ff ArgSortCst
   ),
 
-  if-verbose (coq.say {header} "declaring projections as canonical"),
-  class-def CurrentClass => private.sort-cs-catch-all ClassName,
-  class-def CurrentClass => private.class-cs-catch-all ClassName,
-
   if-verbose (coq.say {header} "start module Exports"),
 
   log.coq.env.begin-module "Exports" none,
+
+  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
+	with-locality (log.coq.CS.declare-instance ConstPackS),
 
   %(ClassAlias => class-def CurrentClass =>
   %  GRDepsClauses => MixinFirstClass => gref->deps GRPack MLwP =>
@@ -666,6 +669,20 @@ pack-body ClassName PL T MLwA F :- std.do! [
 pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
   synthesis.infer-all-gref->deps PL T BuildC Class,
   mk-app (global PackS) {std.append PL [T, Class]} Body
+].
+
+% [packS-body Structure P T MLwA B] asserts
+%  B = fun m0 ... mn => Pack P T (Class P T m0 ... mn)
+% under a context with P and T
+pred packS-body i:classname, i:list term, i:term, i:list (w-args mixinname), o:term.
+packS-body ClassName PL T _MLwA F :- std.do! [
+  class-def (class ClassName S _),
+	coq.say "ClassName " ClassName,
+  get-constructor S PackS,
+	std.append PL [T] Args,
+	mk-app (global ClassName) Args Class,
+	mk-app (global PackS) Args Constructor,
+	F = {{ fun c : lp:Class => lp:Constructor c }}
 ].
 
 % [sort-cs-catch-all ClassName] declares a generic canonical
