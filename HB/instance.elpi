@@ -177,7 +177,8 @@ decl-const-in-struct _Class Name S STy CS:- std.do![
 
   log.coq.env.add-const-noimplicits Name S1 STy1 @transparent! CS, % Bug coq/coq#11155, could be a Let
   % TODO: fine tune the instance priority, I do not see the API for that now.
-  with-locality (coq.TC.declare-instance (const CS) _), % Bug coq/coq#11155, should be local
+	% FIXME: compute the correct priority
+  with-locality (coq.TC.declare-instance (const CS) 1), % Bug coq/coq#11155, should be local
   acc-clause current (local-canonical CS),
   if-verbose (coq.say {header} "structure instance" Name "declared"),
 ].
