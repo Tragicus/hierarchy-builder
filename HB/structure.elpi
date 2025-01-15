@@ -67,9 +67,9 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
-	(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
+  (class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
   if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
-       log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
+	log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
 
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
