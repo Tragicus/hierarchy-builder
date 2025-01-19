@@ -21,7 +21,6 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
 
 (* ********************* structures ****************************** *)
-<<<<<<< HEAD
 From elpi Require Import elpi coercion cs tc.
 
 TC.AddAllClasses.
@@ -38,9 +37,6 @@ tc-HB.structures.tc-unify T T X1 X2 _ R :-
 }}.
 
 Ltac done_tc := apply _.
-=======
-From elpi Require Import elpi coercion.
->>>>>>> 802e5c7 (add elpi coercions when target is not a coercion class and from sort to structure)
 
 Register unify as hb.unify.
 Register id_phant as hb.id.
@@ -949,11 +945,8 @@ HB.structure Definition StructureName params :=
 
 #[arguments(raw)] Elpi Command HB.structure.
 Elpi Accumulate Db coercion.db.
-<<<<<<< HEAD
 Elpi Accumulate Db cs.db.
 Elpi Accumulate Db tc.db.
-=======
->>>>>>> 802e5c7 (add elpi coercions when target is not a coercion class and from sort to structure)
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
