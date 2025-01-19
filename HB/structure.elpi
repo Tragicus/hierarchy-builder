@@ -67,10 +67,6 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
-  (class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
-  if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
-	log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
-
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
     std.assert-ok! (coq.typecheck SortProjection SortProjTy)
@@ -82,8 +78,8 @@ declare Module BSkel Sort :- std.do! [
 
   log.coq.env.begin-module "Exports" none,
 
-  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
-	with-locality (log.coq.CS.declare-instance ConstPackS),
+  if-verbose (coq.say {header} "declaring constructor as canonical"),
+	(class-def CurrentClass => private.sort-cs-catch-all ClassName),
 
   %(ClassAlias => class-def CurrentClass =>
   %  GRDepsClauses => MixinFirstClass => gref->deps GRPack MLwP =>
@@ -677,7 +673,6 @@ pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
 pred packS-body i:classname, i:list term, i:term, i:list (w-args mixinname), o:term.
 packS-body ClassName PL T _MLwA F :- std.do! [
   class-def (class ClassName S _),
-	coq.say "ClassName " ClassName,
   get-constructor S PackS,
 	std.append PL [T] Args,
 	mk-app (global ClassName) Args Class,
