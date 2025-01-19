@@ -13,7 +13,7 @@ Definition eta {T} (x : T) := x.
 Definition ignore {T} (x: T) := x.
 Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
-Ltac done_tc := assumption || apply _ || trivial.
+Ltac done_tc := assumption || typeclasses eauto || trivial.
 
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi coercion cs.
