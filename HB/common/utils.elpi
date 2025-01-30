@@ -353,12 +353,12 @@ saturate-type-constructor T ET :-
 
 % Replaces every argument whose type is a structure by its sort and class.
 pred simpl-tc-instance i:term, o:term.
-simpl-tc-instance (fun N T' Body) R :- std.do! [
+simpl-tc-instance (fun N T' Body) R :-
   copy T' T,
   (T = app [global (indt S)|Params]; (T = global (indt S), Params = [])),
   coq.env.projections S [some SortP, some ClassP],
-  coq.env.indt S _ _ _ _ [BuildS] _,
-  @pi-decl N T x\ sigma Paramsx SortPx ClassPx Ts Tc Rx\
+  coq.env.indt S _ _ _ _ [BuildS] _, !,
+  @pi-decl N T x\ sigma Paramsx SortPx ClassPx Ts Tc Rx\ std.do! [
 	 std.append Params [x] Paramsx,
 	 coq.mk-app (global (const SortP)) Paramsx SortPx,
 	 coq.mk-app (global (const ClassP)) Paramsx ClassPx,
