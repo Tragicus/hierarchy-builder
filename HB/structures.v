@@ -19,10 +19,11 @@ Definition eta {T} (x : T) := x.
 Definition ignore {T} (x: T) := x.
 Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
-Ltac done_tc := assumption || apply _.
 
 (* ********************* structures ****************************** *)
-From elpi Require Import elpi coercion cs.
+From elpi Require Import elpi coercion cs tc.
+
+Ltac done_tc := assumption || elpi TC.Solver.
 
 Register unify as hb.unify.
 Register id_phant as hb.id.
