@@ -67,6 +67,10 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
+	(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
+  if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
+       log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
+
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
     std.assert-ok! (coq.typecheck SortProjection SortProjTy)
@@ -78,8 +82,12 @@ declare Module BSkel Sort :- std.do! [
 
   log.coq.env.begin-module "Exports" none,
 
-  if-verbose (coq.say {header} "declaring constructor as canonical"),
-	(class-def CurrentClass => private.sort-cs-catch-all ClassName),
+  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
+    with-locality (log.coq.CS.declare-instance ConstPackS), 
+
+	coq.TC.declare-class ClassName,
+  ClassProjection = (global ClassP),
+  @global! => coq.TC.declare-instance ClassP 0,
 
   %(ClassAlias => class-def CurrentClass =>
   %  GRDepsClauses => MixinFirstClass => gref-deps GRPack MLwP =>
@@ -128,10 +136,6 @@ declare Module BSkel Sort :- std.do! [
       (private.export-mixin-coercion ClassName)
     ])
     (coq.say "declare:" ClassName "should be an inductive", fail),
-
-  coq.TC.declare-class ClassName,
-  ClassProjection = (global ClassP),
-  @global! => coq.TC.declare-instance ClassP 0,
 
   if-verbose (coq.say {header} "accumulating various props"),
   std.flatten [
@@ -358,6 +362,29 @@ mk-coe-class-body FC TC TMLwP Params T _ CoeBody :- std.do! [
   CoeBody = {{ fun (c : lp:Class) => lp:(ClassCoercion c) }}
 ].
 
+pred mk-coe-structure-class-body
+  i:structure, % From structure
+  i:structure, % To structure
+  i:factoryname, % To factory (for nparams)
+  i:term, % class coercion
+  i:term, % sort projection
+  i:term, % class projection
+  i:list term, i:term, % Params, T
+  i:list (w-args mixinname),
+  o:term.
+mk-coe-structure-class-body StructureF _StructureT _TC Coercion SortProjection ClassProjection
+    Params _T _ SCoeBody :- std.do! [
+
+  mk-app (global StructureF) Params StructureP,
+  mk-app     SortProjection  Params SortP,
+  mk-app     ClassProjection Params ClassP,
+  mk-app     Coercion        Params CoercionP,
+
+  SCoeBody = {{ fun s : lp:StructureP =>
+     (* let T := lp:SortP s in*)
+     lp:CoercionP (lp:SortP s) (lp:ClassP s) }},
+].
+
 pred mk-coe-structure-body
   i:structure, % From structure
   i:structure, % To structure
@@ -395,6 +422,7 @@ declare-coercion SortProjection ClassProjection
   gref->modname StructureT 2 "_" ModNameT,
   CName is ModNameF ^ "_class__to__" ^ ModNameT ^ "_class",
   SName is ModNameF ^ "__to__" ^ ModNameT,
+  SCName is ModNameF ^ "__to__" ^ ModNameT ^ "_class",
 
   if-verbose (coq.say {header} "declare coercion" SName),
 
@@ -421,7 +449,13 @@ declare-coercion SortProjection ClassProjection
   log.coq.env.add-const-noimplicits SName SCoeBody' STy @transparent! SC,
   log.coq.coercion.declare (coercion (const SC) 0 StructureF (grefclass StructureT)),
 
-  log.coq.CS.declare-instance SC,
+  w-params.then FMLwP mk-fun ignore
+    (mk-coe-structure-class-body StructureF StructureT TC Coercion SortProjection ClassProjection)
+    SCCoeBody,
+
+  std.assert-ok! (coq.elaborate-skeleton SCCoeBody SCTy SCCoeBody') ErrorMessage,
+  log.coq.env.add-const-noimplicits SCName SCCoeBody' SCTy @transparent! SCC,
+  coq.TC.declare-instance (const SCC) 1,
 
   w-params.nparams FMLwP NparamsSC,
   acc-clause current (sub-class FC TC SC NparamsSC)
@@ -687,7 +721,7 @@ sort-cs-catch-all ClassName :- std.do! [
   get-constructor S PackS,
   get-structure-sort-projection S Ssort,
   coq.elpi.accumulate _ "cs.db" (clause _ _ (
-    pi ctx lhs rhs res params paramsx cl ty g\
+    pi ctx lhs rhs res params paramsx cl ty g rem\
 		cs ctx lhs rhs res :- std.do![
 		  coq.safe-dest-app lhs Ssort params,
 		  std.append params [rhs, cl] paramsx,
@@ -695,7 +729,7 @@ sort-cs-catch-all ClassName :- std.do! [
 		  mk-app (global S) params ty,
 		  coq.typecheck res ty ok,
 		  coq.ltac.collect-goals cl [g] [],
-		  coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []]))].
+		  coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem]))].
 
 % [class-cs-catch-all ClassName] declares a generic canonical
 %  structure for the class projection on the structure on class ClassName,
