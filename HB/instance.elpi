@@ -103,7 +103,7 @@ declare-all T [class _ Struct _|Rest] L :- has-instance T Struct, !,
   declare-all T Rest L.
 declare-all T [class Class Struct MLwP|Rest] [pr Name CS|L] :-
   infer-class T Class Struct MLwP S Name STy Clauses, !,
-  decl-const-in-struct Class Name S STy CS,
+  decl-const-in-struct T Class Name S STy CS,
   Clauses => declare-all T Rest L.
 
 declare-all T [class HasNoInstance _ _|Rest] L :-
@@ -128,7 +128,7 @@ declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS|L]
   abstract-holes.main S SC,
   std.assert-ok! (coq.typecheck SC SCTy) "declare-all-on-type-constructor: badly closed",
   
-  decl-const-in-struct Class Name SC SCTy CS,
+  decl-const-in-struct T Class Name SC SCTy CS,
 
   Clauses => declare-all-on-type-constructor TK Rest L.
 
@@ -169,8 +169,7 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
 ].
 
 func decl-const-in-struct gref, string, term, term, constant ->.
-decl-const-in-struct Class Name S STy CS:- std.do![
-
+decl-const-in-struct T Class Name S STy CS:- std.do![
   if (ground_term S) (S1 = S, STy1 = STy)
     (abstract-holes.main S S1,
      std.assert-ok! (coq.typecheck S1 STy1) "HB: structure instance illtyped after generalizing over holes"),
@@ -179,6 +178,10 @@ decl-const-in-struct Class Name S STy CS:- std.do![
   coq.TC.get-inst-prio Class (const CS) Prio,
   if (Prio = tc-priority-given N) (true) (Prio = tc-priority-computed N),
   with-locality (coq.TC.declare-instance (const CS) N), % Bug coq/coq#11155, should be local
+	coq.safe-dest-app STy (global Hd) _,
+	term->cs-pattern T Pat,
+	class-def (class Hd Struct _),
+	coq.elpi.accumulate _ "hb.db" (clause _ _ (has-canonical-structure-on Pat Struct)),
   acc-clause current (local-canonical CS),
   Struct = indt SInd,
   coq.env.indt SInd _ NParams _ _ _ _,
@@ -394,8 +397,8 @@ declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.d
     MLCano => std.do! [
       list-w-params_list {factory-provides Factory} ML,
       add-all-mixins T Factory ML tt Clauses CFL,
-      std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas,
-      ClausesHas => declare-all T {findall-classes-for ML} CSL, % declare-all-on-type-constructor doesn't work here
+      std.spy (std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas),
+      ClausesHas => std.spy (declare-all T {findall-classes-for ML} CSL), % declare-all-on-type-constructor doesn't work here
     ]
   ],
 ].
