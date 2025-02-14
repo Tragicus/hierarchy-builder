@@ -128,15 +128,13 @@ namespace hb {
       std.append LT LB L.
     get-args-to-compile.aux _ [].
 
-    pred get-args-to-compile.gather i:term, i:int, o:list int, o:list int.
-    get-args-to-compile.gather (prod _ _ T) N L Avoid :-
-      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L Avoid.
-    get-args-to-compile.gather (app [_|Args]) _ L Avoid :-
+    pred get-args-to-compile.gather i:term, i:int, o:list int.
+    get-args-to-compile.gather (prod _ _ T) N L :-
+      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L.
+    get-args-to-compile.gather (app [_|Args]) _ L :-
       std.rev Args [Pat|Params], !,
-      (Pat = app [_|Args']; Args' = []),
-      std.append Args' Params Ts,
-      std.map Ts get-args-to-compile.aux I,
-      std.map-filter Args' get-args-to-compile.index Avoid,
+      if (Pat = app [_|Args']) (std.append Args' Params T) (T = Params),
+      std.map T get-args-to-compile.aux I,
       std.flatten I L.
 
     pred get-args-to-compile i:term, o:list int.
@@ -147,7 +145,6 @@ namespace hb {
       mergesort Avoid' Avoid'',
       undup Avoid'' Avoid,
       sorted-diff L3 Avoid L.
-
 
 
     % [translate-ty T Args TSort TClass] asserts that T is a type that
@@ -235,7 +232,7 @@ namespace hb {
   pred copy! i:term, o:term.
   copy! T T' :- copy T T', !.
 
-  % simpl-tc-instance (prod _ T _) X TR XR asserts that TR is of the form
+======  % simpl-tc-instance (prod _ T _) X TR XR asserts that TR is of the form
   % (prod Sort _ (x\ prod Class _ _)) when T is a structure and SortP and ClassP
   % are its projections. X is of type (prod _ T _) and XR of type TR, such that XR s c = X (Pack s c).
   % If X = ClassP _, we fail.
@@ -346,6 +343,7 @@ namespace tc {
     func instance term, term -> prop.
     instance Ty ProofHd Clause :-
       hb.compile Ty ProofHd Clause, !.
+
   }
 }
 }}.
@@ -474,6 +472,11 @@ pred join o:classname, o:classname, o:classname.
 % @gares : is it really a func. Ideally I think so, bu we load mixin-mem via
 % `Clauses =>` in infer-class. Should perform a dynamic check?
 func mixin-mem term -> gref.
+
+% [has-canonical-structure-on Pat Struct] means that we declared an instance
+% of structure Struct on pattern Pat.
+pred has-canonical-structure-on o:cs-pattern, o:structure.
+
 
 % [has-canonical-structure-on Pat Struct] means that we declared an instance
 % of structure Struct on pattern Pat.
