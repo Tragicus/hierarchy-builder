@@ -20,7 +20,7 @@ if-MC-compat _.
 
 func with-locality (func) ->.
 with-locality P :-
-  if (get-option "local" tt) (A = @local!) (A = @global!),
+  if (std.spy (get-option "local" tt)) (A = @local!) (A = @global!),
   A => P.
 
 func acc-clause scope, prop.
@@ -351,29 +351,3 @@ saturate-type-constructor T ET :-
   coq.count-prods TH N,
   coq.mk-app T {coq.mk-n-holes N} ET.
 
-% Replaces every argument whose type is a structure by its sort and class.
-pred simpl-tc-instance i:term, o:term.
-simpl-tc-instance (fun N T' Body) R :-
-  copy T' T,
-  (T = app [global (indt S)|Params]; (T = global (indt S), Params = [])),
-  coq.env.projections S [some SortP, some ClassP],
-  coq.env.indt S _ _ _ _ [BuildS] _, !,
-  @pi-decl N T x\ sigma Paramsx SortPx ClassPx Ts Tc Rx\ std.do! [
-	 std.append Params [x] Paramsx,
-	 coq.mk-app (global (const SortP)) Paramsx SortPx,
-	 coq.mk-app (global (const ClassP)) Paramsx ClassPx,
-	 coq.typecheck SortPx Ts ok,
-	 coq.typecheck ClassPx Tc ok,
-	 @pi-decl _ Ts xs\
-     copy SortPx xs => copy Tc (Tc' xs),
-     @pi-decl _ (Tc' xs) xc\ sigma Paramsxsc Bx Body'\
-       std.append Params [xs, xc] Paramsxsc,
-       coq.mk-app (global (indc BuildS)) Paramsxsc Bx,
-       R = (fun _ Ts (xs\ fun _ (Tc' xs) (xc\ Rx xs xc))),
-       copy ClassPx xc =>
-       copy SortPx xs =>
-		   copy x Bx => copy (Body x) Body',
-		 simpl-tc-instance Body' (Rx xs xc)].
-simpl-tc-instance (fun N T Body) (fun N T Rx) :-
-  @pi-decl N T x\ simpl-tc-instance (Body x) (Rx x).
-simpl-tc-instance I I.

@@ -58,6 +58,148 @@ Notation "{  A  'of'  P  &  ..  &  Q  &  }" :=
   (at level 0, A at level 99) : HB_scope.
 Global Open Scope HB_scope.
 
+(* Hacking the tc solver's instance compilation clause. *)
+Elpi Accumulate tc.db lp:{{
+namespace hb {
+  namespace simpl-tc-instance {
+    pred mergesort.split i:list int, o:list int, o:list int.
+    mergesort.split [] [] [].
+    mergesort.split [X] [X] [].
+    mergesort.split [X, Y | L] [X|L1] [Y|L2] :-
+      mergesort.split L L1 L2.
+
+    pred mergesort.merge i:list int, i:list int, o:list int.
+    mergesort.merge [] L L.
+    mergesort.merge L [] L.
+    mergesort.merge [X|L1] [Y|L2] L :-
+      if (X < Y) (mergesort.merge L1 [Y|L2] L', L = [X|L'])
+        (mergesort.merge [X|L1] L2 L', L = [Y|L']).
+
+    pred mergesort i:list int, o:list int.
+    mergesort [] [].
+    mergesort [X] [X].
+    mergesort L L' :-
+      mergesort.split L L1 L2,
+      mergesort L1 L'1,
+      mergesort L2 L'2,
+      mergesort.merge L'1 L'2 L'.
+
+    pred undup i:list int, o:list int.
+    undup [] [].
+    undup [X, X|L] L' :- undup [X|L] L'.
+    undup [X|L] [X|L'] :- undup L L'.
+
+    pred get-args-to-compile.index i:term, o:int.
+    get-args-to-compile.index (app [Hd|_]) N :- get-args-to-compile.index Hd N.
+
+    pred get-args-to-compile.aux i:term, o:list int.
+    get-args-to-compile.aux (app Args) [I] :-
+      std.last Args Pat,
+      coq.safe-dest-app Pat Hd _,
+      get-args-to-compile.index Hd I.
+    get-args-to-compile.aux (fun _ T Body) L :-
+      get-args-to-compile.aux T LT,
+      (pi x\ get-args-to-compile.aux (Body x) LB),
+      std.append LT LB L.
+    get-args-to-compile.aux _ [].
+
+    pred get-args-to-compile.gather i:term, i:int, o:list int.
+    get-args-to-compile.gather (prod _ _ T) N L :-
+      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L.
+    get-args-to-compile.gather (app [_|Args]) _ L :-
+      std.rev Args [Pat|Params], !,
+      if (Pat = app [_|Args']) (std.append Args' Params T) (T = Params),
+      std.map T get-args-to-compile.aux I,
+      std.flatten I L.
+
+    pred get-args-to-compile i:term, o:list int.
+    get-args-to-compile T L :-
+      get-args-to-compile.gather T 0 L',
+      mergesort L' L'',
+      undup L'' L.
+
+
+    % [translate-ty T Args TSort TClass] asserts that T is a type that
+    % ends in a record with two projections (our best approximation for structures declared by us). It produces two
+    % types TSort and TClass obtained from T by replacing the structure with its sort and class projection respectively.
+    pred translate-ty i:term, i:list term, o:term, o:term -> term.
+    translate-ty (prod N T TBody) Args (prod N T TSort) (xs\ prod N T (TClass xs)) :-
+      pi x\ translate-ty (TBody x) [x|Args] (TSort x) (xs\ TClass xs x).
+    translate-ty T Args TSort TClass :- std.do! [
+      coq.safe-dest-app T (global (indt S)) Params,
+      coq.env.record? S _,
+      coq.env.projections S [some SortP, some ClassP],
+      @pi-decl _ T x\ sigma Paramsx SortPx ClassPx TClass'\ std.do! [
+        std.append Params [x] Paramsx,
+        coq.mk-app (global (const SortP)) Paramsx SortPx,
+        coq.mk-app (global (const ClassP)) Paramsx ClassPx,
+        coq.typecheck SortPx TSort ok,
+        coq.typecheck ClassPx TClass' ok,
+        pi xs\ sigma args xargs\
+          std.rev Args args,
+          coq.mk-app xs args xargs,
+          (copy SortPx xargs) => copy TClass'(TClass xs)] ].
+
+    % [mk-copy-clauses T X Xs Xc Args CopySort CopyClass CopyBuild BuildSX] fully applies (X : T), Xs and Xc
+    % to their arguments, asserts that T ends in a record S and produces copy clauses turning S.sort X into Xs,
+    % S.class X into Xc and X into S.Pack Xs Xc. BuildSX is the term we copy X to when it is not applied.
+    pred mk-copy-clauses i:term, i:term, i:term, i:term, i:list term, o:prop, o:prop, o:prop, o:term.
+    mk-copy-clauses (prod N T' T) X Xs Xc Args (pi x\ CopySort x) (pi x\ CopyClass x) (pi x\ CopyBuild x) (fun N T' (x\ BuildSX x)) :-
+      pi x\ mk-copy-clauses (T x) X Xs Xc [x|Args] (CopySort x) (CopyClass x) (CopyBuild x) (BuildSX x).
+    mk-copy-clauses T X Xs Xc Args' CopySort CopyClass CopyBuild BuildSX :- std.spy-do! [
+      coq.safe-dest-app T (global (indt S)) Params,
+      coq.env.indt S _ _ _ _ [BuildS] _,
+      coq.env.projections S [some SortP, some ClassP],
+      std.rev Args' Args,
+      coq.mk-app X Args XArgs,
+      coq.mk-app Xs Args XsArgs,
+      coq.mk-app Xc Args XcArgs,
+      std.append Params [XArgs] ParamsX,
+      coq.mk-app (global (const SortP)) ParamsX SortPX, 
+      coq.mk-app (global (const ClassP)) ParamsX ClassPX, 
+      coq.mk-app (global (indc BuildS)) {std.append Params [XsArgs, XcArgs]} BuildSX,
+      CopySort = copy SortPX XsArgs,
+      CopyClass = copy ClassPX XcArgs,
+      CopyBuild = copy X BuildSX ].
+  }
+
+  % simpl-tc-instance (prod _ T _) X TR XR asserts that TR is of the form
+  % (prod Sort _ (x\ prod Class _ _)) when T is a structure and SortP and ClassP
+  % are its projections. X is of type (prod _ T _) and XR of type TR, such that XR s c = X (Pack s c).
+  % If X = ClassP _, we fail.
+  pred simpl-tc-instance i:int, i:list int, i:term, i:term, o:term, o:term.
+  simpl-tc-instance I [I|Is] (prod N T' TBody) X (prod _ TSort (xs\ prod _ (TClass xs) (xc\ TRx xs xc))) (fun _ TSort (xs\ fun _ (TClass xs) (xc\ Rx xs xc))) :- 
+    copy T' T,
+    std.spy (simpl-tc-instance.translate-ty T [] TSort TClass), !,
+    @pi-decl N T x\ @pi-decl _ TSort xs\ @pi-decl _ (TClass xs) xc\ sigma CopySort CopyClass CopyBuild Bx\
+      std.spy-do! [
+      simpl-tc-instance.mk-copy-clauses T x xs xc [] CopySort CopyClass CopyBuild Bx,
+      calc (I + 1) I',
+      CopySort => CopyClass => CopyBuild => (copy x Bx) =>
+        std.spy (simpl-tc-instance I' Is (TBody x) {coq.mk-app X [Bx]} (TRx xs xc) (Rx xs xc))].
+  simpl-tc-instance I [I'|Is] (prod N T' TBody) X (prod N T TRx) (fun N T Rx) :- !,
+    copy T' T,
+    calc (I + 1) I'',
+    @pi-decl N T x\ std.spy (simpl-tc-instance I'' [I'|Is] (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x)).
+  simpl-tc-instance _ _ T I T' I' :-
+    copy T T',
+    copy I I'.
+
+  pred has-compiled.
+}
+
+namespace tc {
+  namespace compile {
+    pred instance i:term, i:term, o:prop.
+    instance Ty ProofHd Clause :-
+      not hb.has-compiled,
+      hb.simpl-tc-instance.get-args-to-compile Ty Args,
+      std.spy (hb.simpl-tc-instance 0 Args Ty ProofHd Ty' ProofHd'), !,
+      hb.has-compiled => instance Ty' ProofHd' Clause.
+  }
+}
+}}.
+
 (* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
 (* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
 (* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
@@ -182,6 +324,11 @@ pred join o:classname, o:classname, o:classname.
 % @gares : is it really a func. Ideally I think so, bu we load mixin-mem via
 % `Clauses =>` in infer-class. Should perform a dynamic check?
 func mixin-mem term -> gref.
+
+% [has-canonical-structure-on Pat Struct] means that we declared an instance
+% of structure Struct on pattern Pat.
+pred has-canonical-structure-on o:cs-pattern, o:structure.
+
 
 %%%%%% Memory of exported mixins (HB.structure) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Operations (named mixin fields) need to be exported exactly once,
@@ -463,6 +610,7 @@ HB.mixin Record MixinName T & Factory1 T & … & FactoryN T := {
 *)
 
 #[arguments(raw)] Elpi Command HB.mixin.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -545,6 +693,7 @@ Elpi Export HB.mixin.
 *)
 
 Elpi Tactic HB.pack_for.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -568,6 +717,7 @@ Elpi Typecheck.
 Elpi Export HB.pack_for.
 
 Elpi Tactic HB.pack.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -646,6 +796,7 @@ HB.structure Definition StructureName params :=
 #[arguments(raw)] Elpi Command HB.structure.
 Elpi Accumulate Db coercion.db.
 Elpi Accumulate Db cs.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -729,6 +880,7 @@ Elpi Export HB.structure.
 *)
 
 #[arguments(raw)] Elpi Command HB.saturate.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -779,6 +931,7 @@ HB.instance Definition N Params := Factory.Build Params T …
 *)
 
 #[arguments(raw)] Elpi Command HB.instance.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -821,6 +974,7 @@ Elpi Export HB.instance.
 (** [HB.factory] declares a factory. It has the same syntax of [HB.mixin] *)
 
 #[arguments(raw)] Elpi Command HB.factory.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -904,6 +1058,7 @@ HB.end.
 *)
 
 #[arguments(raw)] Elpi Command HB.builders.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -945,6 +1100,7 @@ Elpi Export HB.builders.
 
 
 #[arguments(raw)] Elpi Command HB.end.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -1148,6 +1304,7 @@ HB.instance Definition _ : Ml ... T := ml.
 *)
 
 #[arguments(raw)] Elpi Command HB.declare.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
