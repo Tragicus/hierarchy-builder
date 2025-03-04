@@ -222,7 +222,7 @@ operation-body-and-ty EXI Poperation Struct Psort Pclass Params _T (triple _ Par
   Bo = fun `s` StructType Body,
   Ty = prod `s` StructType BodyTy,
   (@pi-decl `s` StructType s\ sigma Carrier Class\ std.do! [
-      mk-app PsortP [s] Carrier,
+      coq.elaborate-skeleton {mk-app PsortP [s]} _ Carrier ok,
       mk-app PclassP [s] Class,
       synthesis.under-mixin-src-from-factory.do! Carrier Class [
         % just in case..
@@ -376,13 +376,13 @@ join-body N1 N2 S3 S2_Pack S1_sort S3_to_S1 S2_class S3_to_S2
   P N _Ty _F (fun N S3P Pack) :- !,
   mk-app (global S3) P S3P, !,
   @pi-decl N S3P s\
-  sigma S3_to_S1_Ps S3_to_S2_Ps S1_sortS3Ps S2_classS3Ps Holes1 Holes2 \ std.do! [
+  sigma S3_to_S1_Ps S3_to_S2_Ps S1_sortS3Ps S2_classS3Ps Holes1 Holes2 HS3_to_S1_Ps \ std.do! [
     coq.mk-n-holes N2 Holes2,
     coq.mk-n-holes N1 Holes1,
     mk-app S3_to_S1 {std.append P [s]} S3_to_S1_Ps,
-    mk-app S1_sort {std.append Holes1 [S3_to_S1_Ps]} S1_sortS3Ps,
+		coq.elaborate-skeleton {mk-app S1_sort {std.append Holes1 [S3_to_S1_Ps]} } _ S1_sortS3Ps ok,
     mk-app S3_to_S2 {std.append P [s]} S3_to_S2_Ps,
-    mk-app S2_class {std.append Holes2 [S3_to_S2_Ps]} S2_classS3Ps ,
+		mk-app S2_class {std.append Holes2 [S3_to_S2_Ps]} S2_classS3Ps,
     mk-app S2_Pack {std.append Holes2 [S1_sortS3Ps, S2_classS3Ps]} (Pack s)
   ].
 
