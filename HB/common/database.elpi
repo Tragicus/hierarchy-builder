@@ -351,15 +351,19 @@ has-cs-instance GTy (cs-instance _ (cs-gref GTy) _).
 
 pred mixin-src->has-mixin-instance i:prop, o:prop.
 mixin-src->has-mixin-instance  (mixin-src (global GR) M I) (has-mixin-instance (cs-gref GR) M IHd) :-
+	not (has-mixin-instance (cs-gref GR) M _),
   term->gref I IHd.
 
 mixin-src->has-mixin-instance (mixin-src (app [global GR|_] ) M I) (has-mixin-instance (cs-gref GR) M IHd) :-
+	not (has-mixin-instance (cs-gref GR) M _),
   term->gref I IHd.
 
 mixin-src->has-mixin-instance (mixin-src (prod _ _ _ ) M I) (has-mixin-instance cs-prod M IHd):-
+	not (has-mixin-instance cs-prod M _),
   term->gref I IHd.
 
 mixin-src->has-mixin-instance (mixin-src (sort U) M I) (has-mixin-instance (cs-sort U) M IHd):-
+	not (has-mixin-instance (cs-sort U) M _),
   term->gref I IHd.
 
 % this auxiliary function iterates over the list of arguments of an application,
