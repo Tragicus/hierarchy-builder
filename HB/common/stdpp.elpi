@@ -151,10 +151,11 @@ constraint print-ctx mixin-src {
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 func coq.term-is-gref? term -> gref.
-coq.term-is-gref? (global GR) GR.
-coq.term-is-gref? (pglobal GR _) GR.
-coq.term-is-gref? (app [Hd|_]) GR :- coq.term-is-gref? Hd GR.
-coq.term-is-gref? (let _ _ T x\x) GR :- coq.term-is-gref? T GR.
+coq.term-is-gref? (global GR) GR :- !.
+coq.term-is-gref? (pglobal GR _) GR :- !.
+coq.term-is-gref? (app [Hd|_]) GR :- !, coq.term-is-gref? Hd GR.
+coq.term-is-gref? (let _ _ T x\x) GR :- !, coq.term-is-gref? T GR.
+coq.term-is-gref? (primitive (proj P _)) (const C) :- !, coq.env.primitive-projection? P C.
 
 func coq.prod-tgt->gref term -> gref.
 coq.prod-tgt->gref T GR :- whd1 T T1, !, coq.prod-tgt->gref T1 GR.
