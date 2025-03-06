@@ -500,9 +500,9 @@ join-body N1 N2 S3 S2_Pack S1_sort S3_to_S1 S2_class S3_to_S2
     coq.mk-n-holes N2 Holes2,
     coq.mk-n-holes N1 Holes1,
     mk-app S3_to_S1 {std.append P [s]} S3_to_S1_Ps,
-		coq.elaborate-skeleton {mk-app S1_sort {std.append Holes1 [S3_to_S1_Ps]} } _ S1_sortS3Ps ok,
+    coq.elaborate-skeleton {mk-app S1_sort {std.append Holes1 [S3_to_S1_Ps]} } _ S1_sortS3Ps ok,
     mk-app S3_to_S2 {std.append P [s]} S3_to_S2_Ps,
-		mk-app S2_class {std.append Holes2 [S3_to_S2_Ps]} S2_classS3Ps,
+    mk-app S2_class {std.append Holes2 [S3_to_S2_Ps]} S2_classS3Ps,
     mk-app S2_Pack {std.append Holes2 [S1_sortS3Ps, S2_classS3Ps]} (Pack s)
   ].
 
