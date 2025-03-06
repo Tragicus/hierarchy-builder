@@ -71,7 +71,7 @@ declare-const Name BodySkel TyWPSkel CFL CSL :- std.do! [
 
   private.check-non-forgetful-inheritance TheType Factory,
 
-	private.declare-instance Factory TheType TheFactory Clauses CFL CSL,
+  private.declare-instance Factory TheType TheFactory Clauses CFL CSL,
 
   if (CSL = [])
      (coq.warning "HB" "HB.no-new-instance" "HB: no new instance is generated")
@@ -84,7 +84,6 @@ declare-const Name BodySkel TyWPSkel CFL CSL :- std.do! [
   ),
 
   % we accumulate clauses now that the section is over
-  if-verbose (coq.say {header} "accumulating clauses " Clauses),
   acc-clauses current Clauses
 ].
 
@@ -110,7 +109,7 @@ declare-all T [class Class Struct MLwP|Rest] [pr Name CS|L] :-
 
   decl-const-in-struct Name S STy CS,
 
-  if (get-option "verbose" tt) (std.spy (Clauses => declare-all T Rest L)) (Clauses => declare-all T Rest L).
+  Clauses => declare-all T Rest L.
 
 declare-all T [class HasNoInstance _ _|Rest] L :-
   % filter out classes we can't build for sure
@@ -159,7 +158,7 @@ infer-class T  Class Struct MLwP S Name STy Clauses:- std.do![
   params->holes MLwP Params,
   get-constructor Class KC,
 
-  if (get-option "verbose" tt) (std.spy (synthesis.infer-all-args-let Params T KC KCApp ok)) (synthesis.infer-all-args-let Params T KC KCApp ok),
+  synthesis.infer-all-args-let Params T KC KCApp ok,
 	if-verbose (coq.say {header} "we can build a" {nice-gref->string Struct} "on"
 		{coq.term->string T}),
 
@@ -174,7 +173,7 @@ infer-class T  Class Struct MLwP S Name STy Clauses:- std.do![
   coq.mk-app (global KS) {std.append Params [T, KCAppNames]} S,
   if-verbose (coq.say {header} "structure instance for" Name "is" {coq.term->string S}),
 
-  if (get-option "verbose" tt) (std.spy (coq.typecheck S STy ok)) (coq.typecheck S STy ok), % failure may be due to a parameter not rich enough see #435
+  coq.typecheck S STy ok, % failure may be due to a parameter not rich enough see #435
      
 ].
 
@@ -259,7 +258,7 @@ mk-factory-sort-factory AliasGR CFL CSL :- std.do! [
 
 % create instances for all possible combinations of types and structure compatible 
 pred saturate-instances i:cs-pattern.
-saturate-instances Filter :- Actions = [
+saturate-instances Filter :- std.do! [
 
   findall-has-mixin-instance Filter ClausesHas,
 
@@ -274,8 +273,7 @@ saturate-instances Filter :- Actions = [
   Clauses => std.forall2 TL UKL (t\k\sigma Classes\
     std.filter AllClasses (no-instance-for k) Classes,
     declare-all-on-type-constructor t Classes _),
-],
-	if (get-option "verbose" tt) (std.spy-do! Actions) (std.do! Actions).
+].
 
 pred no-instance-for i:cs-pattern, i:class.
 no-instance-for K (class _ S _) :-
@@ -428,7 +426,7 @@ hnf X X.
 
 pred optimize-class-body i:term, i:int, i:term, o:term, o:list prop.
 optimize-class-body T NParams (let _ _ MBo R) R1 Clauses :- std.do! [
-  if (get-option "verbose" tt) (std.spy (declare-mixin-name {hnf MBo} MC CL1)) (declare-mixin-name {hnf MBo} MC CL1),
+  declare-mixin-name {hnf MBo} MC CL1,
   if (T = global (indt _), MC = global (const C), not(coq.env.opaque? C))
      (log.coq.strategy.set [C] (level 1000)) true, % opaque stops simpl
   optimize-class-body T NParams (R MC) R1 CL2,

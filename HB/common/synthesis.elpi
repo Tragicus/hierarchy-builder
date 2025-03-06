@@ -71,7 +71,7 @@ infer-all-args-let Ps T GR X Diag :- std.do! [
   coq.env.typeof GR Ty,
   coq.mk-eta (-1) Ty (global GR) EtaF,
   coq.subst-fun {std.append Ps [T]} EtaF FT,
-  if (get-option "verbose" tt) (std.spy (private.instantiate-all-args-let FT T X Diag)) (private.instantiate-all-args-let FT T X Diag),
+  private.instantiate-all-args-let FT T X Diag,
 ].
 
 
@@ -106,12 +106,11 @@ local-canonical-mixins-of T MSL :- std.do! [
 % Given TheType and a factory instance (on it), makes all the mixins provided by
 % the factory available for inference.
 pred under-mixin-src-from-factory.do! i:term, i:term, i:list prop.
-under-mixin-src-from-factory.do! TheType TheFactory LP :- Actions = [
+under-mixin-src-from-factory.do! TheType TheFactory LP :- std.do! [
   private.factory-instance->new-mixins [] TheFactory ML,
   std.map ML (m\c\ c = mixin-src TheType m TheFactory) MLClauses,
   MLClauses => std.do! LP
-],
-	if (get-option "verbose" tt) (std.spy-do! Actions) (std.do! Actions).
+].
 
 % Given TheType and a factory instance (on it), builds all the *new* mixins
 % provided by the factory available for and passes them to the given
@@ -184,7 +183,7 @@ namespace private {
 % [mixin-for T M MI] synthesizes an instance of mixin M on type T using
 % the databases [mixin-src] and [from]
 pred mixin-for i:term, i:mixinname, o:term.
-mixin-for T M MICompressed :- Actions = [ mixin-src T M Tm,
+mixin-for T M MICompressed :- std.do! [ mixin-src T M Tm,
   %if-verbose (coq.say {header} "Trying to infer mixin for" M),
   std.assert-ok! (coq.typecheck Tm Ty) "mixin-for: Tm illtyped",
 
@@ -199,8 +198,7 @@ mixin-for T M MICompressed :- Actions = [ mixin-src T M Tm,
 
   %if-verbose (coq.say {header} "Trying to compress mixin for" {coq.term->string MI}),
   compress-coercion-paths MI MICompressed,
-],
- if (get-option "verbose" tt) (std.spy-do! Actions) (std.do! Actions).
+].
 
 pred drop i:int, i:list A, o:list A.
 drop 0 L L :- !.
@@ -264,7 +262,7 @@ pred instantiate-all-args-let i:term, i:term, o:term, o:diagnostic.
 instantiate-all-args-let (fun N Tm F) T (let N Tm X R) Diag :- !, std.do! [
   coq.safe-dest-app Tm (global TmGR) _,
   factory-alias->gref TmGR M ok,
-  if (if (get-option "verbose" tt) (std.spy (mixin-for T M X)) (mixin-for T M X))
+  if (mixin-for T M X)
      (@pi-def N Tm X m\ instantiate-all-args-let (F m) T (R m) Diag)
      (Diag = error Msg,
       Msg is "cannot synthesize mixin " ^ {nice-gref->string M} ^
@@ -277,7 +275,7 @@ instantiate-all-args-let F _ F ok.
 % which can be candidates from that class instance. It finds instances which are
 % concrete, that is not by projecting a rich type (a variable) to its class.
 pred structure-instance->mixin-srcs i:term, i:structure, o:list prop.
-structure-instance->mixin-srcs T S MSLC :- Actions = [
+structure-instance->mixin-srcs T S MSLC :- std.do! [
   structure-key SortProj _ S,
   class-def (class (indt Class) S CMLwP),
   structure-nparams S NParams,
@@ -288,12 +286,8 @@ structure-instance->mixin-srcs T S MSLC :- Actions = [
   coq.unify-eq T SortHolesST ok,
   % we look for an instance which is concrete, we take the parts
   get-constructor S KS,
-	@redflags! coq.redflags.all => coq.reduction.lazy.whd ST (app [global KS|STargs]),
-	% Ensure that the unification did not unfold T
-	term->cs-pattern T Tpat,
-	term->cs-pattern {std.nth NParams STargs} STpat,
-	STpat = Tpat,
-	std.nth {calc (NParams + 1)} STargs CT,
+  @redflags! coq.redflags.all => coq.reduction.lazy.whd ST (app [global KS|STargs]),
+  std.nth {calc (NParams + 1)} STargs CT,
   % if the class instance is concrete, we take the parts
   get-constructor (indt Class) KC,
   std.length {list-w-params_list CMLwP} CMixinsN,
@@ -303,8 +297,7 @@ structure-instance->mixin-srcs T S MSLC :- Actions = [
   % we finally generare micin-src clauses for all mixins
   std.map MIL (structure-instance->mixin-srcs.aux T) MSLL,
   std.flatten MSLL MSLC,
-],
-	if (get-option "verbose" tt) (std.spy-do! Actions) (std.do! Actions).
+].
 % this catch all sucks a bit, but is very relevant. Some instance, like
 % unification hints (canonical coercions) which require a type which is too rich
 % fail the second unif problem

@@ -23,7 +23,7 @@ main Ty Args Instance :- std.do! [
 
   if (var T) (coq.error "HB.pack: you must pass a type or at least one factory") true,
 
-  if2 (T = app[global (const SortProj)|ProjParams], structure-key SortProj ClassProj _)
+  if2 (T = app[Hd|ProjParams], coq.term-is-gref? Hd (const SortProj), structure-key SortProj ClassProj _)
         (AllFactories = [app[global (const ClassProj)|ProjParams] | Factories], Tkey = T) % already existing class on T
       (def T _ _ Tkey) % we unfold letins if we can, they may hide constants with CS instances
         (AllFactories = Factories)
@@ -52,7 +52,7 @@ synth-instance.aux Params KC KS T Tkey [] MLCano Instance :-
 
 pred synth-instance i:list term, i:gref, i:gref, i:term, i:term, i:list term, o:term.
 synth-instance Params KC KS T Tkey Factories Instance :-
-	if (coq.safe-dest-app Tkey (global _) _) (synthesis.local-canonical-mixins-of Tkey MLCano) (MLCano = []),
+	if (coq.safe-dest-app Tkey Hd _, coq.term-is-gref? Hd _) (get-option "verbose" tt => synthesis.local-canonical-mixins-of Tkey MLCano) (MLCano = []),
 	synth-instance.aux Params KC KS T Tkey Factories MLCano Instance.
 
 pred elab-factories i:list argument, i:term, o:list term.
