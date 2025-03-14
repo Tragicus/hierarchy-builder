@@ -107,7 +107,7 @@ declare-all T [class Class Struct MLwP|Rest] [pr Name CS|L] :-
 
   !,
 
-  decl-const-in-struct T Class Name S STy CS,
+  decl-const-in-struct T Name S STy CS,
 
   Clauses => declare-all T Rest L.
 
@@ -135,7 +135,7 @@ declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS|L]
   abstract-holes.main S SC,
   std.assert-ok! (coq.typecheck SC SCTy) "declare-all-on-type-constructor: badly closed",
   
-  decl-const-in-struct T Class Name SC SCTy CS,
+  decl-const-in-struct T Name SC SCTy CS,
 
   Clauses => declare-all-on-type-constructor TK Rest L.
 
@@ -153,7 +153,7 @@ has-instance T Struct :-
      fail. % we build it
 
 pred infer-class i:term, i:classname, i:gref, i:factories, o:term, o:string, o:term, o:list prop.
-infer-class T Class Struct MLwP S Name STy Clauses:- std.spy-do![
+infer-class T Class Struct MLwP S Name STy Clauses:- std.do![
 
   params->holes MLwP Params,
   get-constructor Class KC,
@@ -175,9 +175,8 @@ infer-class T Class Struct MLwP S Name STy Clauses:- std.spy-do![
      
 ].
 
-pred decl-const-in-struct i:term, i:gref, i:string, i:term, i:term, i:constant.
-decl-const-in-struct T Class Name S STy CS:- std.do![
-	coq.say "decl-const-in-struct" T Class Name S STy CS,
+pred decl-const-in-struct i:term, i:string, i:term, i:term, i:constant.
+decl-const-in-struct T Name S STy CS:- std.do![
   log.coq.env.add-const-noimplicits Name S STy @transparent! CS, % Bug coq/coq#11155, could be a Let
   % TODO: fine tune the instance priority, I do not see the API for that now.
 	% FIXME: compute the correct priority
@@ -391,8 +390,8 @@ declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.d
     MLCano => std.do! [
       list-w-params_list {factory-provides Factory} ML,
       add-all-mixins T Factory ML tt Clauses CFL,
-      std.spy (std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas),
-      ClausesHas => std.spy (declare-all T {findall-classes-for ML} CSL), % declare-all-on-type-constructor doesn't work here
+      std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas,
+      ClausesHas => declare-all T {findall-classes-for ML} CSL, % declare-all-on-type-constructor doesn't work here
     ]
   ],
 ].

@@ -125,14 +125,16 @@ namespace hb {
       coq.env.projections S [some SortP, some ClassP],
       @pi-decl _ T x\ sigma Paramsx SortPx ClassPx TClass'\ std.do! [
         std.append Params [x] Paramsx,
-        coq.mk-app (global (const SortP)) Paramsx SortPx,
+        if (coq.env.primitive-projection? SortPP SortP SortPN)
+          (SortPx = app [primitive (proj SortPP SortPN), x])
+          (coq.mk-app (global (const SortP)) Paramsx SortPx),
         coq.mk-app (global (const ClassP)) Paramsx ClassPx,
         coq.typecheck SortPx TSort ok,
         coq.typecheck ClassPx TClass' ok,
         pi xs\ sigma args xargs\
           std.rev Args args,
           coq.mk-app xs args xargs,
-          (copy SortPx xargs) => copy TClass'(TClass xs)] ].
+          (copy SortPx xargs) => copy TClass' (TClass xs)] ].
 
     % [mk-copy-clauses T X Xs Xc Args CopySort CopyClass CopyBuild BuildSX] fully applies (X : T), Xs and Xc
     % to their arguments, asserts that T ends in a record S and produces copy clauses turning S.sort X into Xs,
@@ -140,7 +142,7 @@ namespace hb {
     pred mk-copy-clauses i:term, i:term, i:term, i:term, i:list term, o:prop, o:prop, o:prop, o:term.
     mk-copy-clauses (prod N T' T) X Xs Xc Args (pi x\ CopySort x) (pi x\ CopyClass x) (pi x\ CopyBuild x) (fun N T' (x\ BuildSX x)) :-
       pi x\ mk-copy-clauses (T x) X Xs Xc [x|Args] (CopySort x) (CopyClass x) (CopyBuild x) (BuildSX x).
-    mk-copy-clauses T X Xs Xc Args' CopySort CopyClass CopyBuild BuildSX :- std.spy-do! [
+    mk-copy-clauses T X Xs Xc Args' CopySort CopyClass CopyBuild BuildSX :- std.do! [
       coq.safe-dest-app T (global (indt S)) Params,
       coq.env.indt S _ _ _ _ [BuildS] _,
       coq.env.projections S [some SortP, some ClassP],
@@ -149,8 +151,12 @@ namespace hb {
       coq.mk-app Xs Args XsArgs,
       coq.mk-app Xc Args XcArgs,
       std.append Params [XArgs] ParamsX,
-      coq.mk-app (global (const SortP)) ParamsX SortPX, 
-      coq.mk-app (global (const ClassP)) ParamsX ClassPX, 
+      if (coq.env.primitive-projection? SortPP SortP SortPN)
+        (SortPX = app [primitive (proj SortPP SortPN), XArgs])
+        (coq.mk-app (global (const SortP)) ParamsX SortPX),
+      if (coq.env.primitive-projection? ClassPP ClassP ClassPN)
+        (ClassPX = app [primitive (proj ClassPP ClassPN), XArgs])
+        (coq.mk-app (global (const ClassP)) ParamsX ClassPX),
       coq.mk-app (global (indc BuildS)) {std.append Params [XsArgs, XcArgs]} BuildSX,
       CopySort = copy SortPX XsArgs,
       CopyClass = copy ClassPX XcArgs,
@@ -164,17 +170,17 @@ namespace hb {
   pred simpl-tc-instance i:int, i:list int, i:term, i:term, o:term, o:term.
   simpl-tc-instance I [I|Is] (prod N T' TBody) X (prod _ TSort (xs\ prod _ (TClass xs) (xc\ TRx xs xc))) (fun _ TSort (xs\ fun _ (TClass xs) (xc\ Rx xs xc))) :- 
     copy T' T,
-    std.spy (simpl-tc-instance.translate-ty T [] TSort TClass), !,
+    simpl-tc-instance.translate-ty T [] TSort TClass, !,
     @pi-decl N T x\ @pi-decl _ TSort xs\ @pi-decl _ (TClass xs) xc\ sigma CopySort CopyClass CopyBuild Bx\
-      std.spy-do! [
+      std.do! [
       simpl-tc-instance.mk-copy-clauses T x xs xc [] CopySort CopyClass CopyBuild Bx,
       calc (I + 1) I',
       CopySort => CopyClass => CopyBuild => (copy x Bx) =>
-        std.spy (simpl-tc-instance I' Is (TBody x) {coq.mk-app X [Bx]} (TRx xs xc) (Rx xs xc))].
+        simpl-tc-instance I' Is (TBody x) {coq.mk-app X [Bx]} (TRx xs xc) (Rx xs xc)].
   simpl-tc-instance I [I'|Is] (prod N T' TBody) X (prod N T TRx) (fun N T Rx) :- !,
     copy T' T,
     calc (I + 1) I'',
-    @pi-decl N T x\ std.spy (simpl-tc-instance I'' [I'|Is] (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x)).
+    @pi-decl N T x\ simpl-tc-instance I'' [I'|Is] (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x).
   simpl-tc-instance _ _ T I T' I' :-
     copy T T',
     copy I I'.
@@ -188,7 +194,7 @@ namespace tc {
     instance Ty ProofHd Clause :-
       not hb.has-compiled,
       hb.simpl-tc-instance.get-args-to-compile Ty Args,
-      std.spy (hb.simpl-tc-instance 0 Args Ty ProofHd Ty' ProofHd'), !,
+      hb.simpl-tc-instance 0 Args Ty ProofHd Ty' ProofHd', !,
       hb.has-compiled => instance Ty' ProofHd' Clause.
   }
 }
