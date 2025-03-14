@@ -232,7 +232,7 @@ namespace hb {
   pred copy! i:term, o:term.
   copy! T T' :- copy T T', !.
 
-======  % simpl-tc-instance (prod _ T _) X TR XR asserts that TR is of the form
+% simpl-tc-instance (prod _ T _) X TR XR asserts that TR is of the form
   % (prod Sort _ (x\ prod Class _ _)) when T is a structure and SortP and ClassP
   % are its projections. X is of type (prod _ T _) and XR of type TR, such that XR s c = X (Pack s c).
   % If X = ClassP _, we fail.
@@ -343,7 +343,6 @@ namespace tc {
     func instance term, term -> prop.
     instance Ty ProofHd Clause :-
       hb.compile Ty ProofHd Clause, !.
-
   }
 }
 }}.

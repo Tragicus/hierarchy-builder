@@ -128,7 +128,7 @@ declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS|L]
   abstract-holes.main S SC,
   std.assert-ok! (coq.typecheck SC SCTy) "declare-all-on-type-constructor: badly closed",
   
-  decl-const-in-struct T Class Name SC SCTy CS,
+  decl-const-in-struct T Name SC SCTy CS,
 
   Clauses => declare-all-on-type-constructor TK Rest L.
 
@@ -397,8 +397,8 @@ declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.d
     MLCano => std.do! [
       list-w-params_list {factory-provides Factory} ML,
       add-all-mixins T Factory ML tt Clauses CFL,
-      std.spy (std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas),
-      ClausesHas => std.spy (declare-all T {findall-classes-for ML} CSL), % declare-all-on-type-constructor doesn't work here
+      std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas,
+      ClausesHas => declare-all T {findall-classes-for ML} CSL, % declare-all-on-type-constructor doesn't work here
     ]
   ],
 ].
