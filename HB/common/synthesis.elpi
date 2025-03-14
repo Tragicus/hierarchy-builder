@@ -67,7 +67,7 @@ infer-holes-depending-on-pack _ X X.
 %   let `a1` ty1 t1 a1\ .... app[global GR, p1, .. pn, T, a1, .. , an]
 % if Diagnostic is ok, else X is unassigned
 func infer-all-args-let list term, term, gref -> term, diagnostic.
-infer-all-args-let Ps T GR X Diag :- std.spy-do! [
+infer-all-args-let Ps T GR X Diag :- std.do! [
   coq.env.typeof GR Ty,
   coq.mk-eta (-1) Ty (global GR) EtaF,
   coq.subst-fun {std.append Ps [T]} EtaF FT,
@@ -261,10 +261,10 @@ instantiate-all-these-mixin-args (fun N Ty F) T ML (fun N Ty FX) :- !,
 instantiate-all-these-mixin-args F _ _ F.
 
 func instantiate-all-args-let term, term -> term, diagnostic.
-instantiate-all-args-let (fun N Tm F) T (let N Tm X R) Diag :- !, std.spy-do! [
+instantiate-all-args-let (fun N Tm F) T (let N Tm X R) Diag :- !, std.do! [
   coq.safe-dest-app Tm (global TmGR) _,
   factory-alias->gref TmGR M ok,
-  if (std.spy (mixin-for T M X))
+  if (mixin-for T M X)
      (@pi-def N Tm X m\ instantiate-all-args-let (F m) T (R m) Diag)
      (Diag = error Msg,
       Msg is "cannot synthesize mixin " ^ {nice-gref->string M} ^
@@ -277,14 +277,18 @@ instantiate-all-args-let F _ F ok.
 % which can be candidates from that class instance. It finds instances which are
 % concrete, that is not by projecting a rich type (a variable) to its class.
 pred structure-instance->mixin-srcs i:term, i:structure, o:list prop.
-structure-instance->mixin-srcs T S MSLC :- std.spy-do! [
+structure-instance->mixin-srcs T S MSLC :- std.do! [
   class-def (class (indt Class) S CMLwP),
   structure-nparams S NParams,
   coq.mk-n-holes NParams Holes,
+  coq.mk-app (global S) Holes SHoles,
+  % find an instance in ST
+	coq.elaborate-skeleton T SHoles ST ok,
   % we look for an instance which is concrete, we take the parts
   get-constructor S KS,
   @redflags! coq.redflags.all => coq.reduction.lazy.whd ST (app [global KS|STargs]),
   std.nth {calc (NParams + 1)} STargs CT,
+	not (var CT),
   % if the class instance is concrete, we take the parts
   get-constructor (indt Class) KC,
   std.length {list-w-params_list CMLwP} CMixinsN,

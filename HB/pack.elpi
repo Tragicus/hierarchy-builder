@@ -24,8 +24,8 @@ main Ty Args Instance :- std.do! [
   if (var T) (coq.error "HB.pack: you must pass a type or at least one factory") true,
 
   if2 (T = app[Hd|ProjParams], coq.term-is-gref? Hd (const SortProj), structure-key SortProj ClassProj _)
-        (if (coq.env.primitive-projection? ClassP ClassProj)
-					(ClassHd = primitive (proj ClassP 0)) %FIXME: 0 can not be correct
+        (if (coq.env.primitive-projection? ClassP ClassProj NP)
+					(ClassHd = primitive (proj ClassP NP))
 					(ClassHd = global (const ClassProj)),
 				AllFactories = [app[ClassHd|ProjParams] | Factories], Tkey = T) % already existing class on T
       (def T _ _ Tkey) % we unfold letins if we can, they may hide constants with CS instances
