@@ -17,6 +17,9 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi coercion cs tc.
 
+TC.AddAllClasses.
+TC.AddAllInstances.
+
 Ltac done_tc := assumption || elpi TC.Solver.
 
 Register unify as hb.unify.
