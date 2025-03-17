@@ -143,10 +143,12 @@ postulate-factories ModName IDF CDecl :-
   context.declare.params-key FLwP ParamsSection FKey FLwA,
   std.assert! (FLwA = [triple GRF _ _])
     "HB: cannot declare builders for more than one factory at a time",
-  gref->deps GRF DepswPRaw,
-  context.declare.mixins FKey ParamsSection DepswPRaw _ _ _,
+  gref-deps GRF DepswPRaw,
+  context.declare.mixins FKey ParamsSection DepswPRaw _ MixinSrc _,
+	std.map MixinSrc (x\y\ x = mixin-src _ _ y) RevMixins,
+	std.rev RevMixins Mixins,
   std.map ParamsSection triple_2 FParams,
-  postulate-factory-abbrev FKey FParams IDF GRF TheFactory,
+  postulate-factory-abbrev FKey FParams IDF GRF Mixins TheFactory,
   define-factory-operations FKey FParams TheFactory GRF,
   acc-clause current (current-mode (builder-from FKey TheFactory GRF ModName)).
 
