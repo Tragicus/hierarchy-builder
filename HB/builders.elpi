@@ -98,15 +98,11 @@ declare-shadowed-located Id (loc-abbreviation Abbrev) :-
   coq.notation.abbreviation-body Abbrev NArgs T,
   @global! => log.coq.notation.add-abbreviation Id NArgs T ff _.
 
-func postulate-factory-abbrev term, list term, id, factoryname, list term -> term.
-postulate-factory-abbrev TheType Params Name Falias Mixins TheFactory :- std.do! [
+func postulate-factory-abbrev term, list term, id, factoryname -> term.
+postulate-factory-abbrev TheType Params Name Falias TheFactory :- std.do! [
   std.assert-ok! (factory-alias->gref Falias F) "HB",
   phant-abbrev F _ Fabv,
-	std.append Params [TheType] PT,
-  coq.notation.abbreviation Fabv PT Package,
-	std.append Mixins _ MTail,
-	std.append PT MTail PTMTail,
-	Package = app [_|PTMTail],
+  coq.notation.abbreviation Fabv {std.append Params [TheType]} Package,
   Msg is "Unable to declare factory " ^ Name,
   std.assert-ok! (coq.typecheck-ty Package _) Msg,
   log.coq.env.add-section-variable-noimplicits Name Package C,
@@ -148,11 +144,9 @@ postulate-factories ModName IDF CDecl :-
   std.assert! (FLwA = [triple GRF _ _])
     "HB: cannot declare builders for more than one factory at a time",
   gref->deps GRF DepswPRaw,
-  context.declare.mixins FKey ParamsSection DepswPRaw _ MixinSrc _,
-	std.map MixinSrc (x\y\ x = mixin-src _ _ y) RevMixins,
-	std.rev RevMixins Mixins,
+  context.declare.mixins FKey ParamsSection DepswPRaw _ _ _,
   std.map ParamsSection triple_2 FParams,
-  postulate-factory-abbrev FKey FParams IDF GRF Mixins TheFactory,
+  postulate-factory-abbrev FKey FParams IDF GRF TheFactory,
   define-factory-operations FKey FParams TheFactory GRF,
   acc-clause current (current-mode (builder-from FKey TheFactory GRF ModName)).
 
