@@ -240,12 +240,12 @@ mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- std.do! [
   class-def (class CN SI _),
   mk-app (global SI) Params SIParams,
   coq.name-suffix N "local" Nlocal,
-  (@pi-decl Nlocal Ty t\ sigma SK KC ML ParamsT SKPT\ std.do! [
+  (@pi-decl Nlocal Ty t\ sigma SK KC ML ParamsT SKPT\ do!-verbose [
     std.map (MLwA t) triple_1 ML,
     std.append Params [t] ParamsT,
     SKPT = app [global {get-constructor SI} | ParamsT],
     ClassTy t = app [global CN | ParamsT],
-    (@pi-decl `s` SIParams s\ @pi-decl `c` (ClassTy t) c\ sigma PF2\ std.do![
+    (@pi-decl `s` SIParams s\ @pi-decl `c` (ClassTy t) c\ sigma PF2\ do!-verbose[
        synthesis.under-mixins.then (MLwA t) (fun-unify-mixin Target)
           (mk-phant-term.mixins.aux t Params c CN PF) PF2,
        fun-unify none s {mk-app SKPT [c]} PF2 (PFU t s c),
@@ -257,10 +257,14 @@ mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- std.do! [
   fun-implicit Nlocal Ty Body Out
 ].
 
-mk-phant-term.mixins.aux T Params C CN PF X :- std.do![
-  get-constructor CN KC,
-  synthesis.infer-all-gref->deps Params T KC KCM,
-  fun-unify none KCM C PF X,
+mk-phant-term.mixins.aux T Params C (indt CN) PF X :- std.do![
+  get-constructor (indt CN) KC,
+  synthesis.infer-all-gref-deps Params T KC KCM,
+	coq.env.projections CN Projs,
+	std.append Params [T, C] ParamsC,
+	std.map Projs (p\ r\ sigma Proj\ p = some Proj, r = app [global (const Proj)|ParamsC]) Args,
+	std.append Params [T|Args] PA,
+  fun-unify none KCM (app [global KC|PA]) PF X,
 ].
 
 func mk-phant-term.class
