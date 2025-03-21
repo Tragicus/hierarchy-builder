@@ -240,7 +240,7 @@ mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- std.do! [
   class-def (class CN SI _),
   mk-app (global SI) Params SIParams,
   coq.name-suffix N "local" Nlocal,
-  (@pi-decl Nlocal Ty t\ sigma SK KC ML ParamsT SKPT\ std.do! [
+  (@pi-decl Nlocal Ty t\ sigma SK KC ML ParamsT SKPT\ do!-verbose [
     std.map (MLwA t) triple_1 ML,
     std.append Params [t] ParamsT,
     SKPT = app [global {get-constructor SI} | ParamsT],
