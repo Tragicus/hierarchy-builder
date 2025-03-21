@@ -102,9 +102,9 @@ pred postulate-factory-abbrev i:term, i:list term, i:id, i:factoryname, o:term.
 postulate-factory-abbrev TheType Params Name Falias TheFactory :- std.do! [
   std.assert-ok! (factory-alias->gref Falias F) "HB",
   phant-abbrev F _ Fabv,
-  coq.notation.abbreviation Fabv {std.append Params [TheType]} Package,
+  coq.notation.abbreviation Fabv {std.append Params [TheType]} Package',
   Msg is "Unable to declare factory " ^ Name,
-  std.assert-ok! (coq.typecheck-ty Package _) Msg,
+  std.assert-ok! (coq.elaborate-ty-skeleton Package' _ Package) Msg,
   log.coq.env.add-section-variable-noimplicits Name Package C,
   TheFactory = global (const C),
 ].
