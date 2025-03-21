@@ -86,6 +86,18 @@ namespace hb {
     undup [X, X|L] L' :- undup [X|L] L'.
     undup [X|L] [X|L'] :- undup L L'.
 
+    pred sorted-diff i:list int, i:list int, o:list int.
+    sorted-diff [] _ [].
+    sorted-diff L [] L.
+    sorted-diff [X|L] [Y|L'] [X|R] :-
+      X < Y,
+      sorted-diff L [Y|L'] R.
+    sorted-diff [X|L] [Y|L'] R :-
+      Y < X,
+      sorted-diff [X|L] L' R.
+    sorted-diff [X|L] [X|L'] R :-
+      sorted-diff L L' R.
+
     pred get-args-to-compile.index i:term, o:int.
     get-args-to-compile.index (app [Hd|_]) N :- get-args-to-compile.index Hd N.
 
@@ -100,20 +112,26 @@ namespace hb {
       std.append LT LB L.
     get-args-to-compile.aux _ [].
 
-    pred get-args-to-compile.gather i:term, i:int, o:list int.
-    get-args-to-compile.gather (prod _ _ T) N L :-
-      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L.
-    get-args-to-compile.gather (app [_|Args]) _ L :-
+    pred get-args-to-compile.gather i:term, i:int, o:list int, o:list int.
+    get-args-to-compile.gather (prod _ _ T) N L Avoid :-
+      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L Avoid.
+    get-args-to-compile.gather (app [_|Args]) _ L Avoid :-
       std.rev Args [Pat|Params], !,
-      if (Pat = app [_|Args']) (std.append Args' Params T) (T = Params),
-      std.map T get-args-to-compile.aux I,
+      (Pat = app [_|Args']; Args' = []),
+      std.append Args' Params Ts,
+      std.map Ts get-args-to-compile.aux I,
+      std.map-filter Args' get-args-to-compile.index Avoid,
       std.flatten I L.
 
     pred get-args-to-compile i:term, o:list int.
     get-args-to-compile T L :-
-      get-args-to-compile.gather T 0 L',
-      mergesort L' L'',
-      undup L'' L.
+      get-args-to-compile.gather T 0 L1 Avoid',
+      mergesort L1 L2,
+      undup L2 L3,
+      mergesort Avoid' Avoid'',
+      undup Avoid'' Avoid,
+      sorted-diff L3 Avoid L.
+
 
 
     % [translate-ty T Args TSort TClass] asserts that T is a type that
