@@ -26,6 +26,58 @@ with-locality P :-
 func acc-clause scope, prop.
 acc-clause Scope C :- coq.elpi.accumulate Scope "hb.db" (clause _ _ C).
 
+pred do-verbose! i:list prop.
+do-verbose! L :- get-option "verbose" tt, std.spy-do! L.
+do-verbose! L :- std.do! L.
+
+pred simpl-proj i:term, o:term.
+simpl-proj (app[global (const C)| Args]) Red :-
+  coq.env.projection? C NParams,
+  NParams < {std.length Args},
+  std.split-at NParams Args _ [S|_],
+  coq.safe-dest-app S SHd _,
+  (SHd = global (indc _);
+    (SHd = global (const SCC),
+    coq.env.const SCC (some SCB) _,
+    coq.reduction.eta-contract SCB (global (indc _)))),
+  coq.env.const C (some P) _,
+  hd-beta P Args (match S _ L) EArgs,
+  whd-indc S SC SArgs, !,
+  match-red SC SArgs L EArgs R RArgs,
+  unwind R RArgs Red',
+  simpl-proj Red' Red.
+simpl-proj (app[primitive (proj _ N), S|Args]) Red :-
+  coq.safe-dest-app S SHd _,
+  (SHd = global (indc _);
+    (SHd = global (const SCC),
+    coq.env.const SCC (some SCB) _,
+    coq.reduction.eta-contract SCB (global (indc _)))),
+  whd-indc S _ SArgs, !,
+  std.nth N SArgs R,
+  unwind R Args Red',
+  simpl-proj Red' Red.
+simpl-proj (app L) Red :- !,
+  std.map L simpl-proj [Hd|Args],
+  coq.mk-app Hd Args Red.
+simpl-proj (fun N Ty Body) (fun N Ty' Body') :- !,
+  simpl-proj Ty Ty',
+  @pi-decl N Ty' x\ simpl-proj (Body x) (Body' x).
+simpl-proj (prod N Ty Body) (prod N Ty' Body') :- !,
+  simpl-proj Ty Ty',
+  @pi-decl N Ty' x\ simpl-proj (Body x) (Body' x).
+simpl-proj (let N T B F) (let N T' B' F') :- !,
+  simpl-proj T T', !,
+  simpl-proj B B', !,
+  (@pi-decl N T' x\ simpl-proj (F x) (F' x)).
+simpl-proj (match T P BR) (match T' P' BR') :- !,
+  simpl-proj T T', !,
+  simpl-proj P P', !,
+  std.map BR simpl-proj BR'.
+simpl-proj (fix N I T Body) (fix N I T' Body') :- !,
+  simpl-proj T T', !,
+  @pi-decl N T' x\ simpl-proj (Body x) (Body' x).
+simpl-proj T T.
+
 /* Uncomment and remove HB/common/compat_acc_clauses_*.elpi once requiring coq-elpi >= 1.18.0,
    which implies Coq >= 8.17
 pred acc-clauses i:scope, i:list prop.
