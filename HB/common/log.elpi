@@ -29,7 +29,9 @@ strategy.set CL S :-
   log.private.log-vernac (log.private.coq.vernac.strategy CL S).
 
 pred env.add-const-noimplicits i:id, i:term, i:term, i:opaque?, o:constant.
-env.add-const-noimplicits Name Bo Ty Opaque C :- std.do! [
+env.add-const-noimplicits Name Bo' Ty' Opaque C :- std.do! [
+  simpl-proj Bo' Bo,
+  simpl-proj Ty' Ty,
   if (not(ground_term Ty ; ground_term Bo))
     (coq.error "HB: cannot infer some information in" Name
                ":" {coq.term->string Ty} ":=" {coq.term->string Bo})

@@ -235,16 +235,16 @@ build-type-pattern.aux _ _ _ :- coq.error "HB: wrong carrier type".
 %       F p_1 ... p_k T m_i0_j0 .. m_il_jl}}
 pred mk-phant-term.mixins i:term, i:term, i:classname, i:phant-term,
   i:list term, i:name, i:term, i:(term -> list (w-args mixinname)), o:phant-term.
-mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- do!-verbose [
+mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- std.do! [
   class-def (class CN SI _),
   mk-app (global SI) Params SIParams,
   coq.name-suffix N "local" Nlocal,
-  (@pi-decl Nlocal Ty t\ sigma SK KC ML ParamsT SKPT\ do!-verbose [
+  (@pi-decl Nlocal Ty t\ sigma SK KC ML ParamsT SKPT\ std.do! [
     std.map (MLwA t) triple_1 ML,
     std.append Params [t] ParamsT,
     SKPT = app [global {get-constructor SI} | ParamsT],
     ClassTy t = app [global CN | ParamsT],
-    (@pi-decl `s` SIParams s\ @pi-decl `c` (ClassTy t) c\ sigma PF2\ do!-verbose[
+    (@pi-decl `s` SIParams s\ @pi-decl `c` (ClassTy t) c\ sigma PF2\ std.do! [
        synthesis.under-mixins.then (MLwA t) (fun-unify-mixin Target)
           (mk-phant-term.mixins.aux t Params c CN PF) PF2,
        fun-unify none s {mk-app SKPT [c]} PF2 (PFU t s c),
@@ -256,7 +256,7 @@ mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- do!-verbose [
   fun-implicit Nlocal Ty Body Out
 ].
 
-mk-phant-term.mixins.aux T Params C (indt CN) PF X :- do!-verbose[
+mk-phant-term.mixins.aux T Params C (indt CN) PF X :- std.do! [
   get-constructor (indt CN) KC,
   synthesis.infer-all-gref-deps Params T KC KCM,
 	coq.env.projections CN Projs,
