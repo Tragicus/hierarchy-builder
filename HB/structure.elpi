@@ -458,6 +458,14 @@ declare-coercion SortProjection ClassProjection
   log.coq.env.add-const-noimplicits SCName SCCoeBody' SCTy @transparent! SCC,
   coq.TC.declare-instance (const SCC) 1,
 
+  StructureF = indt SIndF,
+  coq.env.indt SIndF _ NParamsF _ _ _ _,
+  coq.env.projections SIndF [some SortPF, _],
+  StructureT = indt SIndT,
+  coq.env.indt SIndT _ NParamsT _ _ _ _,
+  coq.env.projections SIndT [some SortPT, _],
+  coq.equivalent-keys.add (global (const SortPF)) {calc (NParamsF + 1)} (global (const SortPT)) {calc (NParamsT + 1)},
+
   w-params.nparams FMLwP NparamsSC,
   acc-clause current (sub-class FC TC SC NparamsSC)
 ].
