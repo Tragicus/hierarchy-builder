@@ -189,7 +189,7 @@ decl-const-in-struct T Name S STy CS:- std.do![
   coq.env.projections SInd [some SortP, _],
   coq.safe-dest-app T THd Targs,
   std.length Targs Nargs,
-  coq.equivalent-keys.add (global (const SortP)) NParams THd Nargs,
+  coq.equivalent-keys.add (global (const SortP)) {calc (NParams + 1)} THd Nargs,
   if-verbose (coq.say {header} "structure instance" Name "declared"),
 ].
 
