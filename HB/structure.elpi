@@ -75,7 +75,11 @@ declare Module BSkel Sort :- std.do! [
     if-verbose (coq.say {header} "define arg_sort"),
     std.assert-ok! (coq.typecheck SortProjection SortProjTy)
       "HB: BUG: cannot retype projection",
-    log.coq.env.add-const-noimplicits "arg_sort" SortProjection SortProjTy ff ArgSortCst
+    if (SortProjection = primitive (proj SortPP _))
+      (coq.env.primitive-projection? SortPP SortPC' _,
+      SortPC = global (const SortPC'))
+      (SortPC = SortProjection),
+    log.coq.env.add-const-noimplicits "arg_sort" SortPC SortProjTy ff ArgSortCst
   ),
 
   if-verbose (coq.say {header} "start module Exports"),
@@ -86,7 +90,10 @@ declare Module BSkel Sort :- std.do! [
     with-locality (log.coq.CS.declare-instance ConstPackS), 
 
 	coq.TC.declare-class ClassName,
-  ClassProjection = (global ClassP),
+  if (ClassProjection = primitive (proj ClassPP _))
+    (coq.env.primitive-projection? ClassPP ClassPC _,
+    ClassP = const ClassPC)
+    (ClassProjection = (global ClassP)),
   @global! => coq.TC.declare-instance ClassP 0,
 	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make {w-params.nparams MLwP} mode-output} [mode-input]},
 
@@ -116,12 +123,12 @@ declare Module BSkel Sort :- std.do! [
   %]),
 
   if-verbose (coq.say {header} "making coercion from type to target"),
-  if (synthesis.infer-coercion-tgt MLwP CoeClass)
-    (if-arg-sort (private.declare-sort-coercion CoeClass Structure
+	if (synthesis.infer-coercion-tgt MLwP CoeClass)
+    (if-arg-sort (private.declare-sort-coercion-elpi Structure
       (global (const ArgSortCst))),
-    private.declare-sort-coercion CoeClass Structure SortProjection)
-	 (if-arg-sort (private.declare-sort-coercion-elpi (global Structure) (global (const ArgSortCst))),
-    private.declare-sort-coercion-elpi (global Structure) SortProjection),
+    private.declare-sort-coercion-elpi Structure SortProjection)
+	 (if-arg-sort (private.declare-sort-coercion-elpi Structure (global (const ArgSortCst))),
+    private.declare-sort-coercion-elpi Structure SortProjection),
 
   private.declare-generic-coercion-elpi Structure,
 
@@ -235,8 +242,8 @@ pred operation-body-and-ty i:list prop, i:constant, i:structure, i:term, i:term,
   i:list term, i:term, i:w-args A, o:pair term term.
 operation-body-and-ty EXI Poperation Struct Psort Pclass Params _T (triple _ ParamsOp _) (pr Bo Ty) :- std.do! [
   mk-app (global Struct) Params StructType,
-  mk-app Psort Params PsortP,
-  mk-app Pclass Params PclassP,
+  if (Psort = primitive _) (PsortP = Psort) (mk-app Psort Params PsortP),
+  if (Pclass = primitive _) (PclassP = Pclass) (mk-app Pclass Params PclassP),
   Bo = fun `s` StructType Body,
   Ty = prod `s` StructType BodyTy,
   (@pi-decl `s` StructType s\ sigma Carrier Class\ std.do! [
@@ -294,24 +301,33 @@ export-operations Structure ProjSort ProjClass MLwP EX1 EX2 MLToExport :- std.do
   std.map LMwPToExport w-params_1 MLToExport,
 ].
 
-pred mk-sort-coercion-aux i:term, i:term, i:term, i:list term, o:prop.
+pred mk-sort-coercion-aux i:term, i:structure, i:term, i:list term, o:prop.
 mk-sort-coercion-aux (prod _N _T Body) Structure P Args Clause :-
   Clause = (pi x\ C x),
   pi x\ mk-sort-coercion-aux (Body x) Structure P [x | Args] (C x).
 
-mk-sort-coercion-aux _ Structure P Args Clause :-
+mk-sort-coercion-aux _ Structure P Args (pi v\ Clause v) :-
+  get-constructor Structure Pack,
   std.rev Args ArgsRev,
-  Clause =
-    (pi ctx v t e r argsAll w\ (coercion ctx v t e r :-
-      coq.unify-eq t (app [Structure | ArgsRev]) ok,
-      std.append ArgsRev [v] argsAll,
-      mk-app P argsAll w,
-      coq.elaborate-skeleton w e r ok,
-      coq.ltac.collect-goals r [] [])).
+  mk-app (global Structure) ArgsRev SArgs,
+  std.length Args NArgs,
+  pi v\ sigma argsAll\ (
+    std.append ArgsRev [v] argsAll,
+    if (P = primitive _)
+      (Clause v =
+        (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
+          if (v = app [global Pack|vargs]) (std.nth NArgs vargs w)
+            (w = app [P, v]),
+          coq.elaborate-skeleton w e r ok)))
+      (Clause v =
+        (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
+          if (v = app [global Pack|vargs]) (std.nth NArgs vargs w)
+            (mk-app P argsAll w),
+          coq.elaborate-skeleton w e r ok)))).
 
-pred mk-sort-coercion i:term, i:term, o:prop.
+pred mk-sort-coercion i:structure, i:term, o:prop.
 mk-sort-coercion Structure P Clause :-
-  coq.typecheck Structure T ok,
+  coq.typecheck (global Structure) T ok,
   mk-sort-coercion-aux T Structure P [] Clause.
 
 pred mk-generic-coercion i:term, i:term, i:term, i:list term, o:prop.
@@ -322,21 +338,16 @@ mk-generic-coercion _ Structure Constructor Args Clause :-
   std.rev Args ArgsRev,
   mk-app Constructor ArgsRev Cargs,
   mk-app Structure ArgsRev Sargs,
-  % N.B. Iwould like to introduce the type of the class in the following typecheck and use it
-  % to avoid the next typecheck.
-  coq.typecheck Cargs (prod _ Tv _) ok,
   Clause =
-    (pi ctx v t e r c w wt g\ (coercion ctx v t e r :-
-      coq.unify-eq e Sargs ok,
-		coq.unify-eq t Tv ok, !,
+    (pi ctx v t e r c w wt g g'\ (coercion ctx v t Sargs r :-
 		% N.B. I have to *not* use r here, otherwise elpi instanciates r temporarily with "app X", which
 		% fails because r is typechecked immediately and "app X" does not typecheck.
       mk-app Cargs [v, c] w, !,
-		coq.typecheck w wt ok,
-		coq.ltac.collect-goals c [g] [], !,
-		% TODO: fine tune the tactic below
-		coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g [], !,
-		r = w, !)).
+		  coq.typecheck w wt ok,
+      coq.ltac.collect-goals c [g] [], !,
+      % TODO: fine tune the tactic below
+      coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g g', !,
+      r = w, !)).
 
 pred mk-coe-class-body
   i:factoryname, % From class
@@ -350,14 +361,17 @@ mk-coe-class-body FC TC TMLwP Params T _ CoeBody :- std.do! [
 
   list-w-params_list TMLwP TML,
   std.map TML (from FC) Builders,
-  std.map Builders (x\r\mk-app (global x) Params r) BuildersP,
+  std.map Builders (x\r\if (x = (primitive (proj _ _))) (r = x) (mk-app x Params r)) BuildersP,
 
   factory->nparams TC TCNP,
   mk-app (global {get-constructor TC})
     {coq.mk-n-holes TCNP} KCHoles,
 
   (pi c\ sigma Mixes\
-    std.map BuildersP (builder\r\ r = app[builder, T, c]) Mixes,
+    std.map BuildersP (builder\r\
+      if (builder = primitive (proj _ _))
+        (r = app [builder, c])
+        (r = app[builder, T, c])) Mixes,
     mk-app KCHoles [T | Mixes] (ClassCoercion c)),
 
   CoeBody = {{ fun (c : lp:Class) => lp:(ClassCoercion c) }}
@@ -377,9 +391,11 @@ mk-coe-structure-class-body StructureF _StructureT _TC Coercion SortProjection C
     Params _T _ SCoeBody :- std.do! [
 
   mk-app (global StructureF) Params StructureP,
-  mk-app     SortProjection  Params SortP,
-  mk-app     ClassProjection Params ClassP,
-  mk-app     Coercion        Params CoercionP,
+  if (SortProjection = primitive _) (SortP = SortProjection)
+    (mk-app SortProjection Params SortP),
+  if (ClassProjection = primitive _) (ClassP = ClassProjection)
+    (mk-app ClassProjection Params ClassP),
+  mk-app Coercion Params CoercionP,
 
   SCoeBody = {{ fun s : lp:StructureP =>
      (* let T := lp:SortP s in*)
@@ -400,9 +416,11 @@ mk-coe-structure-body StructureF StructureT TC Coercion SortProjection ClassProj
     Params _T _ SCoeBody :- std.do! [
 
   mk-app (global StructureF) Params StructureP,
-  mk-app     SortProjection  Params SortP,
-  mk-app     ClassProjection Params ClassP,
-  mk-app     Coercion        Params CoercionP,
+  if (SortProjection = primitive _) (SortP = SortProjection)
+    (mk-app SortProjection Params SortP),
+  if (ClassProjection = primitive _) (ClassP = ClassProjection)
+    (mk-app ClassProjection Params ClassP),
+  mk-app Coercion Params CoercionP,
 
   factory->nparams TC TCNP,
   mk-app (global {get-constructor StructureT})
@@ -572,9 +590,10 @@ declare-class+structure MLwP Sort
   coq.env.projections ClassInd Projs,
   % TODO: put this code in a named clause
   w-params.nparams MLwP NParams,
-  std.map2 {list-w-params_list MLwP} Projs (m\ p\ r\ sigma P\
-    std.assert! (p = some P) "BUG: we build a class with an anonymous field",
-    r = from (indt ClassInd) m (const P)) Factories,
+  std.map2 {list-w-params_list MLwP} Projs (m\ p\ r\ sigma P PP PC PN\
+    std.assert! (p = some PC) "BUG: we build a class with an anonymous field",
+    if (coq.env.primitive-projection? PP PC PN) (P = primitive (proj PP PN)) (P = global (const PC)),
+    r = from (indt ClassInd) m P) Factories,
   AllFactories = [factory->nparams (indt ClassInd) NParams | Factories],
 
   if-verbose (coq.say {header} "declare type record"),
@@ -588,8 +607,12 @@ declare-class+structure MLwP Sort
     (log.coq.env.add-indt StructureDeclaration StructureInd),
 
   coq.env.projections StructureInd [some SortP, some ClassP],
-  global (const SortP) = SortProjection,
-  global (const ClassP) = ClassProjection,
+  if (coq.env.primitive-projection? SortPP SortP SortPN)
+    (SortProjection = primitive (proj SortPP SortPN))
+    (SortProjection = global (const SortP)),
+  if (coq.env.primitive-projection? ClassPP ClassP ClassPN)
+    (ClassProjection = primitive (proj ClassPP ClassPN))
+    (ClassProjection = global (const ClassP)),
 ].
 
 % Declares "sort" as a Coercion Proj : Structurename >-> CoeClass.
@@ -601,14 +624,14 @@ declare-sort-coercion CoeClass StructureName (global Proj) :-
   log.coq.coercion.declare (coercion Proj 0 StructureName CoeClass).
 
 % Declares "sort" as a Coercion in elpi's coercion db Proj : Structurename >-> CoeClass.
-pred declare-sort-coercion-elpi i:term, i:term.
+pred declare-sort-coercion-elpi i:structure, i:term.
 declare-sort-coercion-elpi Structure Proj :-
 
   if-verbose (coq.say {header} "declare sort coercion in elpi"),
 
   %TODO: log.coq.coercion-elpi.declare 
   mk-sort-coercion Structure Proj Clause,
-  coq.elpi.accumulate _ "coercion.db" (clause _ _ Clause).
+  @global! => coq.elpi.accumulate current "coercion.db" (clause _ _ Clause).
 
 % Declares "Pack" as a Coercion in elpi's coercion db
 pred declare-generic-coercion-elpi i:gref.
@@ -620,7 +643,7 @@ declare-generic-coercion-elpi S :-
   if-verbose (coq.say {header} "declare `Pack` as a coercion in elpi"),
 
   %TODO: log.coq.coercion-elpi.declare 
-  coq.elpi.accumulate _ "coercion.db" (clause _ _ Clause).
+  @global! => coq.elpi.accumulate current "coercion.db" (clause _ _ Clause).
 
 pred if-class-already-exists-error i:id, i:list class, i:list mixinname.
 if-class-already-exists-error _ [] _.
@@ -639,7 +662,7 @@ export-mixin-coercion ClassName (some C) :-
   log.coq.coercion.declare (coercion (const C) _ ClassName (grefclass MixinGR)).
 
 pred mc-compat-structure i:string, i:modpath, i:list mixinname, i:int, i:term, i:gref, i:option gref.
-mc-compat-structure ModuleName _Module NewMixins CNParams ClassProjection GRPack Axioms :- std.do! [
+mc-compat-structure ModuleName _Module NewMixins _ ClassProjection GRPack Axioms :- std.do! [
   CompatModuleName is "MathCompCompat" ^ ModuleName,
   log.coq.env.begin-module CompatModuleName none, % to avoid collisions
   log.coq.env.begin-module ModuleName none,
@@ -668,10 +691,7 @@ mc-compat-structure ModuleName _Module NewMixins CNParams ClassProjection GRPack
     (if-verbose (coq.say "mc-compat-structure: not exactly one new mixin")),
 
   if-verbose (coq.say "mc-compat-structure: declaring notation 'class_of'"),
-  std.assert-ok! (coq.typecheck ClassProjection ClassProjectionTy) "wtf",
-  CArgs is CNParams + 1,
-  mk-eta CArgs ClassProjectionTy ClassProjection EtaClassProjection,
-  @global! => log.coq.notation.add-abbreviation "class_of" CArgs EtaClassProjection ff _,
+  @global! => log.coq.notation.add-abbreviation "class_of" 0 ClassProjection ff _,
 
   log.coq.env.end-module-name ModuleName _,
   log.coq.env.end-module-name CompatModuleName MCCompat,
@@ -686,9 +706,11 @@ clone-phant-body ClassName SortProjection ((indt I) as Structure) PL T _ PhF :- 
   mk-app (global Structure) PL SPL,
   (@pi-decl `cT` SPL cT\
   mk-app (global ClassName) {std.append PL [T]} CPL,
+  if (SortProjection = primitive (proj _ _)) (SortPL = SortProjection)
+    (mk-app SortProjection PL SortPL),
   @pi-decl `c` CPL c\
   (Ph cT c) =
-    {phant.fun-unify none T {mk-app {mk-app SortProjection PL} [cT]}
+    {phant.fun-unify none T {mk-app SortPL [cT]}
       {phant.fun-unify none cT {mk-app PackPLT [c]}
         {phant.init {mk-app PackPLT [c]}} }}),
   PhF = {phant.fun-real `cT` SPL cT\ {phant.fun-implicit `c` CPL c\ Ph cT c }}
@@ -764,7 +786,9 @@ mk-infer-key CoeClass K (w-params.nil ID _ _) St PhK :-
   @pi-parameter ID St t\ phant.init {mk-app K [t]} (PhKBo t),
   phant.fun-infer-type CoeClass {coq.id->name ID} St PhKBo PhK.
 mk-infer-key CoeClass K (w-params.cons ID Ty W) St R :-
-  @pi-parameter ID Ty t\ mk-infer-key CoeClass {mk-app K [t]} (W t) {mk-app St [t]} (PhT t),
+  @pi-parameter ID Ty t\ sigma K'\
+    (if (K = primitive _) (K' = K) (mk-app K [t] K'),
+    mk-infer-key CoeClass K' (W t) {mk-app St [t]} (PhT t)),
   phant.fun-implicit {coq.id->name ID} Ty PhT R.
 
 pred if-coverage-not-good-error i:list mixinname.

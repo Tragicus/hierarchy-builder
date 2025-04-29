@@ -12,7 +12,7 @@ func from_mixin prop -> mixinname.
 from_mixin (from _ X _) X.
 
 func from_builder prop -> term.
-from_builder (from _ _ X) (global X).
+from_builder (from _ _ X) X.
 
 func mixin-src_mixin prop -> mixinname.
 mixin-src_mixin (mixin-src _ M _) M.
