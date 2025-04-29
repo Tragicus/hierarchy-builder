@@ -36,7 +36,7 @@ tc-HB.structures.tc-unify T T X1 X2 _ R :-
   R = {{ @id_phant lp:T lp:X1 (@Phant lp:T lp:X1) }}.
 }}.
 
-Ltac done_tc := apply _.
+Ltac done_tc := assumption || elpi TC.Solver.
 
 Register unify as hb.unify.
 Register id_phant as hb.id.
@@ -226,7 +226,6 @@ namespace hb {
     %  RT = prod N Ty (x\ prod _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ T' x)),
     %  RX = fun N Ty (x\ fun _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ X' x)).
     %abstract-params _ _ T X T X.
-
   }
 
   pred copy! i:term, o:term.
