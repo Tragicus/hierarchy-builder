@@ -92,13 +92,13 @@ declare Module BSkel Sort :- std.do! [
     with-locality (log.coq.CS.declare-instance ConstPackS), 
   class-def CurrentClass => private.sort-cs-catch-all ClassName NParams,
 
+	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make {w-params.nparams MLwP} mode-output} [mode-input]},
 	coq.TC.declare-class ClassName,
   if (ClassProjection = primitive (proj ClassPP _))
     (coq.env.primitive-projection? ClassPP ClassPC _,
     ClassP = const ClassPC)
     (ClassProjection = (global ClassP)),
   @global! => coq.TC.declare-instance ClassP 0,
-	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make {w-params.nparams MLwP} mode-output} [mode-input]},
 
   %(ClassAlias => class-def CurrentClass =>
   %  GRDepsClauses => MixinFirstClass => gref->deps GRPack MLwP =>
