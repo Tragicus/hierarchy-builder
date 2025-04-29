@@ -45,7 +45,7 @@ namespace private {
 pred pp-from i:prop.
 pp-from (from F M T) :-
   coq.say "From" {coq.term->string (global F)} "to" {coq.term->string (global M)},
-  coq.say "  " {coq.term->string (global T)},
+  coq.say "  " {coq.term->string T},
   coq.say "".
 
 pred pp-list-w-params i:mixins, i:term.

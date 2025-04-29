@@ -26,6 +26,16 @@ From elpi Require Import elpi coercion cs tc.
 TC.AddAllClasses.
 TC.AddAllInstances.
 
+Elpi Query TC.Solver lp:{{
+  global C = {{ unify }},
+  coq.TC.declare-class C.
+}}.
+Elpi Accumulate TC.Solver lp:{{
+tc-HB.structures.tc-unify T T X1 X2 _ R :-
+  coq.unify-eq X1 X2 ok,
+  R = {{ @id_phant lp:T lp:X1 (@Phant lp:T lp:X1) }}.
+}}.
+
 Ltac done_tc := assumption || elpi TC.Solver.
 
 Register unify as hb.unify.
@@ -209,6 +219,17 @@ namespace hb {
     avoid-pattern Pat (app L) :- !,
       std.last L X,
       not (Pat = X).
+
+    pred abstract-params i:term, i:list term, i:term, i:term, o:term, o:term.
+    abstract-params (prod N Ty TBody) [P|Args] T X RT RX :-
+      (@pi-decl N Ty x\ abstract-params (TBody x) Args T X (T'' x) (X'' x),
+        copy P x => (copy (T'' x) (T' x),
+          copy (X'' x) (X' x))
+      ),
+      RT = prod N Ty (x\ prod _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ T' x)),
+      RX = fun N Ty (x\ fun _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ X' x)).
+    abstract-params _ _ T X T X.
+
   }
 
   pred copy! i:term, o:term.
@@ -222,7 +243,7 @@ namespace hb {
   simpl-tc-instance (prod N T TBody) X RT RX :- 
     simpl-tc-instance.translate-ty T [] TSort TClass,
     @pi-decl N T x\ @pi-decl _ TSort xs\ @pi-decl _ (TClass xs) xc\ sigma CopyClauses Bx TBody' TBody''\
-      simpl-tc-instance.mk-copy-clauses T x xs xc [] CopyClauses Bx),
+      simpl-tc-instance.mk-copy-clauses T x xs xc [] CopyClauses Bx,
       CopyClauses => copy! (TBody x) TBody',
       simpl-tc-instance.avoid-pattern xs TBody',
       simpl-tc-instance.check-progress (TBody x) TBody',
@@ -233,6 +254,14 @@ namespace hb {
       RX = fun _ TSort (xs\ fun _ (TClass xs) (xc\ Rx xs xc)).
   simpl-tc-instance (prod N T TBody) X (prod N T TRx) (fun N T Rx) :- !,
     @pi-decl N T x\ simpl-tc-instance (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x).
+  %simpl-tc-instance T ((app [Class|CArgs]) as X) T' X' :-
+  %  std.rev CArgs [Subject|RevParams],
+  %  std.rev RevParams Params,
+  %  coq.typecheck Class TClass ok,
+  %  simpl-tc-instance.abstract-params TClass Params T X T0 X0,
+  %  coq.safe-dest-app Subject Key Args,
+  %  coq.typecheck Key TKey ok,
+  %  simpl-tc-instance.abstract-params TKey Args T0 X0 T' X'.
   simpl-tc-instance T I T I :- !.
 
   pred has-compiled.
@@ -314,7 +343,7 @@ pred class-def o:hbclass.
 %  - c1 .. cm are terms built using p1 .. pn and T
 % - [factory-requires FN LMN]
 % [from _ M _] tests whether M is a declared mixin.
-pred from o:factoryname, o:mixinname, o:gref.
+pred from o:factoryname, o:mixinname, o:term.
 
 %%%%% Abbreviations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
