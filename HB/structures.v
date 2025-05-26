@@ -259,15 +259,56 @@ namespace hb {
   simpl-tc-instance T I T I :- !.
 
   pred has-compiled.
+
+  pred compile.subject i:list term, i:string, i:term, i:list term, i:list term, i:list term, i:list term, i:term, i:list term, i:list term, o:prop.
+  compile.subject [_|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
+    pi a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
+  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
+    std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
+    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, {coq.mk-app ProofHd HArgs}]} C,
+    %std.append HParams HSArgs H,
+    if (HArgs = []) (Clause = (C :- 
+      std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
+      std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok)))
+    (Clause = (C :- sigma gs dgs gs'\
+      std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
+      std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
+      std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok),
+      coq.ltac.collect-goals (app HArgs) gs dgs,
+      %I solve too many goals, but for now whatever.
+      %std.filter gs (h\ not (std.mem H h)) gs',
+      gs' = gs,
+      msolve gs' [])).
+
+  pred compile.params i:list term, i:string i:term, i:list term, i:list term, i:list term, i:list term, i:term, o:prop.
+  compile.params [_|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
+    pi p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
+  compile.params [] PredName ProofHd HArgs TArgs Params HParams S Clause :-
+    coq.safe-dest-app S K SArgs,
+    compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
+
+  pred compile.telescope i:term, i:term, i:list term, i:list term, o:prop.
+  compile.telescope (prod _ T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
+    pi x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
+  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause :- !,
+    coq.TC.class? Class,
+    tc.gref->pred-name Class PredName,
+    std.rev PS [S|RP],
+    std.rev RP Params,
+    compile.params Params PredName ProofHd HArgs TArgs Params [] S Clause.
+
+  pred compile i:term, i:term, o:prop.
+  compile Ty ProofHd Clause :-
+    compile.telescope Ty ProofHd [] [] Clause.
 }
 
+pred tc.gref->pred-name i:gref, o:string.
 namespace tc {
+  pred lettify.main i:term, o:term.
   namespace compile {
     pred instance i:term, i:term, o:prop.
     instance Ty ProofHd Clause :-
-      not hb.has-compiled,
-      hb.simpl-tc-instance Ty ProofHd Ty' ProofHd', !,
-      hb.has-compiled => instance Ty' ProofHd' Clause.
+      hb.compile Ty ProofHd Clause.
   }
 }
 }}.
