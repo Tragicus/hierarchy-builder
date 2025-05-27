@@ -127,8 +127,8 @@ declare Module BSkel Sort :- std.do! [
     (if-arg-sort (private.declare-sort-coercion-elpi Structure
       (global (const ArgSortCst))),
     private.declare-sort-coercion-elpi Structure SortProjection)
-	 (if-arg-sort (private.declare-sort-coercion-elpi Structure (global (const ArgSortCst))),
-    private.declare-sort-coercion-elpi Structure SortProjection),
+	 (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
+    private.declare-sort-coercion CoeClass Structure SortProjection),
 
   private.declare-generic-coercion-elpi Structure,
 
