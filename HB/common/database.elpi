@@ -436,9 +436,8 @@ get-canonical-instances TyTrm StructL :-
 func has-CS-instance? term, structure ->.
 has-CS-instance? TyTerm (indt Struct) :-
   term->cs-pattern TyTerm Pat,
-  coq.env.projections Struct [some Proj, _],
-  coq.CS.db-for (const Proj) Pat L,
-  not(L = []).
+  has-canonical-structure-on Pat (indt Struct)
+].
 
 pred structure-nparams i:structure, o:int.
 structure-nparams Structure NParams :-

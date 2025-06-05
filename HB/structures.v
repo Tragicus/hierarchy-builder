@@ -36,7 +36,7 @@ tc-HB.structures.tc-unify T T X1 X2 _ R :-
   R = {{ @id_phant lp:T lp:X1 (@Phant lp:T lp:X1) }}.
 }}.
 
-Ltac done_tc := assumption || elpi TC.Solver.
+Ltac done_tc := apply _.
 
 Register unify as hb.unify.
 Register id_phant as hb.id.
@@ -284,7 +284,7 @@ namespace hb {
       %I solve too many goals, but for now whatever.
       %std.filter gs (h\ not (std.mem H h)) gs',
       gs' = gs,
-      msolve gs' [])).
+      std.forall gs' (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []))).
 
   pred compile.params i:list term, i:string i:term, i:list term, i:list term, i:list term, i:list term, i:term, o:prop.
   compile.params [_|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
