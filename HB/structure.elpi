@@ -67,9 +67,9 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
-	(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
-  if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
-       log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
+	%(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
+  %if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
+  %     log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
 
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
@@ -86,10 +86,13 @@ declare Module BSkel Sort :- std.do! [
 
   log.coq.env.begin-module "Exports" none,
 
-  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
-    with-locality (log.coq.CS.declare-instance ConstPackS), 
+  w-params.nparams MLwP NParams,
 
-	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make {w-params.nparams MLwP} mode-output} [mode-input]},
+%  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
+%    with-locality (log.coq.CS.declare-instance ConstPackS), 
+  class-def CurrentClass => private.sort-cs-catch-all ClassName NParams,
+
+	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make NParams mode-output} [mode-input]},
 	coq.TC.declare-class ClassName,
   if (ClassProjection = primitive (proj ClassPP _))
     (coq.env.primitive-projection? ClassPP ClassPC _,
@@ -748,21 +751,31 @@ packS-body ClassName PL T _MLwA F :- std.do! [
 % [sort-cs-catch-all ClassName] declares a generic canonical
 %  structure for the sort projection on the structure on class ClassName,
 %  deferring the instanciation of the class field to typeclass resolution.
-pred sort-cs-catch-all i:classname.
-sort-cs-catch-all ClassName :- std.do! [
+pred sort-cs-catch-all i:classname, i:int.
+sort-cs-catch-all ClassName NParams :- std.do! [
   class-def (class ClassName S _),
   get-constructor S PackS,
   get-structure-sort-projection S Ssort,
-  coq.elpi.accumulate _ "cs.db" (clause _ _ (
-    pi ctx lhs rhs res params paramsx cl ty g rem\
-		cs ctx lhs rhs res :- std.do![
-		  coq.safe-dest-app lhs Ssort params,
-		  std.append params [rhs, cl] paramsx,
-		  mk-app (global PackS) paramsx res,
-		  mk-app (global S) params ty,
-		  coq.typecheck res ty ok,
-		  coq.ltac.collect-goals cl [g] [],
-		  coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem]))].
+  if (calc NParams 0)
+    ((pi ctx rhs res\ 
+        coq.elpi.predicate "cs" [ctx, Ssort, rhs, res] (CS0 ctx rhs res)),
+    coq.elpi.accumulate _ "cs.db" (clause _ _ (
+      pi ctx rhs res cl ty g rem\
+      CS0 ctx rhs res :- std.do![
+        mk-app (global PackS) [rhs, cl] res,
+        coq.typecheck res (global S) ok,
+        coq.ltac.collect-goals cl [g] [],
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem])))
+    ((pi ctx params rhs res\ coq.elpi.predicate "cs" [ctx, (app [Ssort|params]), rhs, res] (CS ctx params rhs res)),
+    coq.elpi.accumulate _ "cs.db" (clause _ _ (
+      pi ctx rhs res params paramsx cl ty g rem\
+      CS ctx params rhs res :- std.do![
+        std.append params [rhs, cl] paramsx,
+        mk-app (global PackS) paramsx res,
+        mk-app (global S) params ty,
+        coq.typecheck res ty ok,
+        coq.ltac.collect-goals cl [g] [],
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem])))].
 
 % [class-cs-catch-all ClassName] declares a generic canonical
 %  structure for the class projection on the structure on class ClassName,
