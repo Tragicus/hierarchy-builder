@@ -264,6 +264,32 @@ namespace hb {
   %  simpl-tc-instance.abstract-params TKey Args T0 X0 T' X'.
   simpl-tc-instance T I T I :- !.
 
+  pred get-evars i:term, o:list term.
+  get-evars X [X] :- var X, !.
+  get-evars (app L) E :-
+    std.map L get-evars EL,
+    std.flatten EL E.
+  get-evars (fun _ T B) E :-
+    get-evars T ET,
+    (pi x\ get-evars (B x) EB),
+    std.append ET EB E.
+  get-evars (prod _ T B) E :-
+    get-evars T ET,
+    (pi x\ get-evars (B x) EB),
+    std.append ET EB E.
+  get-evars (let _ T X B) E :-
+    get-evars T ET,
+    get-evars X EX,
+    (pi x\ get-evars (B x) EB),
+    std.append EX EB EXB,
+    std.append ET EXB E.
+  get-evars _ [].
+
+  pred mem-var i:list term, o:term.
+  mem-var [] _.
+  mem-var [X|_] Y :- X == Y.
+  mem-var [_|L] Y :- mem-var L Y.
+
   pred has-compiled.
 
   pred compile.subject i:list term, i:string, i:term, i:list term, i:list term, i:list term, i:list term, i:term, i:list term, i:list term, o:prop.
@@ -276,15 +302,20 @@ namespace hb {
     if (HArgs = []) (Clause = (C :- 
       std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
       std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok)))
-    (Clause = (C :- sigma gs dgs gs'\
+    (Clause = (C :- sigma gs dgs gs' hargs ehargs' ehargs ehparams ehsargs eh' eh\
       std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
       std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
       std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok),
-      coq.ltac.collect-goals (app HArgs) gs dgs,
-      %I solve too many goals, but for now whatever.
-      %std.filter gs (h\ not (std.mem H h)) gs',
-      gs' = gs,
-      std.forall gs' (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []))).
+      std.map HArgs get-evars ehargs',
+      std.flatten ehargs' ehargs,
+      std.map HParams get-evars ehparams,
+      std.map HSArgs get-evars ehsargs,
+      std.append ehparams ehsargs eh', 
+      std.flatten eh' eh,
+      std.filter ehargs (x\ not (mem-var eh x)) hargs,
+      (hargs = []; 
+        (coq.ltac.collect-goals (app hargs) gs dgs,
+        std.forall gs (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []))))).
 
   pred compile.params i:list term, i:string i:term, i:list term, i:list term, i:list term, i:list term, i:term, o:prop.
   compile.params [_|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
