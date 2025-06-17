@@ -132,7 +132,7 @@ declare Module BSkel Sort :- std.do! [
 	 (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
     private.declare-sort-coercion CoeClass Structure SortProjection),
 
-  private.declare-generic-coercion-elpi Structure,
+  %private.declare-generic-coercion-elpi Structure,
 
   if-verbose (coq.say {header} "exporting unification hints"),
   ClassAlias => Factories => GRDepsClauses =>
@@ -759,22 +759,24 @@ sort-cs-catch-all ClassName NParams :- std.do! [
     ((pi ctx rhs res\ 
         coq.elpi.predicate "cs" [ctx, Ssort, rhs, res] (CS0 ctx rhs res)),
     coq.elpi.accumulate _ "cs.db" (clause _ _ (
-      pi ctx rhs res cl ty g rem\
+      pi ctx rhs res res' cl ty g rem\
       CS0 ctx rhs res :- std.do![
-        mk-app (global PackS) [rhs, cl] res,
-        coq.typecheck res (global S) ok,
+        mk-app (global PackS) [rhs, cl] res',
+        coq.typecheck res' (global S) ok,
         coq.ltac.collect-goals cl [g] [],
-        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem])))
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem,
+        res = res'])))
     ((pi ctx params rhs res\ coq.elpi.predicate "cs" [ctx, (app [Ssort|params]), rhs, res] (CS ctx params rhs res)),
     coq.elpi.accumulate _ "cs.db" (clause _ _ (
-      pi ctx rhs res params paramsx cl ty g rem\
+      pi ctx rhs res res' params paramsx cl ty g rem\
       CS ctx params rhs res :- std.do![
         std.append params [rhs, cl] paramsx,
-        mk-app (global PackS) paramsx res,
+        mk-app (global PackS) paramsx res',
         mk-app (global S) params ty,
-        coq.typecheck res ty ok,
+        coq.typecheck res' ty ok,
         coq.ltac.collect-goals cl [g] [],
-        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem])))].
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem,
+        res = res'])))].
 
 % [class-cs-catch-all ClassName] declares a generic canonical
 %  structure for the class projection on the structure on class ClassName,
