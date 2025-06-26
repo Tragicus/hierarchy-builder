@@ -434,9 +434,10 @@ get-canonical-instances TyTrm StructL :-
   std.map-filter DBGTyL get-cs-instance StructL.
 
 pred has-CS-instance? i:term, i:structure.
-has-CS-instance? TyTerm (indt Struct) :-
+has-CS-instance? TyTerm Struct :- std.do! [
   term->cs-pattern TyTerm Pat,
-  has-canonical-structure-on Pat (indt Struct).
+  has-canonical-structure-on Pat Struct
+].
 
 pred structure-nparams i:structure, o:int.
 structure-nparams Structure NParams :-
