@@ -212,7 +212,8 @@ saturate-instances Filter :- std.do! [
 
 pred no-instance-for i:cs-pattern, i:class.
 no-instance-for K (class _ S _) :-
-  get-structure-sort-projection S {coq.env.global Proj},
+  get-structure-sort-projection S G,
+  coq.env.global Proj G,
   coq.CS.db-for Proj K [].
 
 /* ------------------------------------------------------------------------- */
@@ -249,8 +250,6 @@ add-mixin T FGR MakeCanon MissingMixin [MixinSrcCl, BuilderDeclCl] CSL :- std.do
   new_int N, % timestamp
 
   synthesis.assert!-infer-mixin T MissingMixin Bo,
-  MixinSrcCl = mixin-src T MixinName {coq.env.global (const C)},
-  BuilderDeclCl = builder-decl (builder N FGR MixinName (const C)),
 
   std.assert-ok! (coq.typecheck Bo Ty) "declare-instances: mixin illtyped",
   coq.safe-dest-global-app Ty MixinNameAlias _,
@@ -264,6 +263,11 @@ add-mixin T FGR MakeCanon MissingMixin [MixinSrcCl, BuilderDeclCl] CSL :- std.do
     (Name is {gref->modname FGR 2 "_"} ^"__to__" ^ {gref->modname MixinName 2 "_"},
      if-verbose (coq.say {header} "declare mixin instance" Name),
      log.coq.env.add-const-noimplicits Name Bo Ty @transparent! C),
+
+  coq.env.global (const C) G,
+  MixinSrcCl = mixin-src T MixinName G,
+  BuilderDeclCl = builder-decl (builder N FGR MixinName (const C)),
+
   if (MakeCanon = tt, whd {coq.env.global (const C)} [] X _, coq.env.global (indc _) X)
      (std.do! [
          if-verbose (coq.say {header} "declare canonical mixin instance" C),
