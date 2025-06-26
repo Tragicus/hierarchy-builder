@@ -207,14 +207,16 @@ drop N [_|XS] L :- !, N1 is N - 1, drop N1 XS L.
 
 pred compress-copy o:term, o:term.
 compress-copy (app [G | L]) R :-
-  coq.env.global (const C) G,
   sub-class C2 C3 C NparamsC,
-  drop NparamsC L [app [{coq.env.global (const C')} | L']],
+  coq.env.global (const C) G,
+  drop NparamsC L [app [G' | L']],
   sub-class C1 C2 C' NparamsC',
+  coq.env.global (const C') G',
   drop NparamsC' L' L'',
   sub-class C1 C3 C'' NparamsC'',
   std.append {coq.mk-n-holes NparamsC''} L'' HL'',
-  CHL'' = app [{coq.env.global (const C'')} | HL''],
+  CHL'' = app [G'' | HL''],
+  coq.env.global (const C'') G'',
   coq.typecheck CHL'' _ ok, !,
   compress-copy CHL'' R.
 compress-copy (app L) (app L1) :- !, std.map L compress-copy L1.
@@ -250,7 +252,7 @@ builder->term Ps T Src Tgt B :- !, std.do! [
 % thus instanciating an abstraction on mixin M_i with X_i
 pred instantiate-all-these-mixin-args i:term, i:term, i:list mixinname, o:term.
 instantiate-all-these-mixin-args (fun _ Tm F) T ML R :-
-  coq.safe-dest-app Tm {coq.env.global TmGR} _,
+  coq.safe-dest-global-app Tm TmGR _,
   factory-alias->gref TmGR M ok,
   std.mem! ML M,
   !,
@@ -262,7 +264,7 @@ instantiate-all-these-mixin-args F _ _ F.
 
 pred instantiate-all-args-let i:term, i:term, o:term, o:diagnostic.
 instantiate-all-args-let (fun N Tm F) T (let N Tm X R) Diag :- !, std.do! [
-  coq.safe-dest-app Tm {coq.env.global TmGR} _,
+  coq.safe-dest-global-app Tm TmGR _,
   factory-alias->gref TmGR M ok,
   if (mixin-for T M X)
      (@pi-def N Tm X m\ instantiate-all-args-let (F m) T (R m) Diag)

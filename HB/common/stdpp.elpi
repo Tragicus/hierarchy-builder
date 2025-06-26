@@ -219,8 +219,9 @@ coq.abstract-indt-decl [C|CS] X (parameter ID explicit Ty1 X1) :-
   coq.gref->id (const C) ID,
   coq.env.typeof (const C) Ty,
   copy Ty Ty1,
+  coq.env.global (const C) G,
   @pi-parameter ID Ty x\
-    (copy {coq.env.global (const C)} x :- !) =>
+    (copy G x :- !) =>
     coq.abstract-indt-decl CS X (X1 x).
 
 % [coq.abstract-const-decl Section I AbsI] abstracts I over the Section variables
@@ -232,8 +233,9 @@ coq.abstract-const-decl [C|CS] X (pr (fun Name Ty1 X1) (prod Name Ty1 X2)) :-
   coq.id->name ID Name,
   coq.env.typeof (const C) Ty,
   copy Ty Ty1,
+  coq.env.global (const C) G,
   @pi-parameter ID Ty x\
-    (copy {coq.env.global (const C)} x :- !) =>
+    (copy G x :- !) =>
     coq.abstract-const-decl CS X (pr (X1 x) (X2 x)).
 
 % [coq.copy-clauses-for-unfold CS CL] generates clauses for the copy predicate
@@ -242,14 +244,15 @@ pred coq.copy-clauses-for-unfold i:list constant, o:list prop.
 coq.copy-clauses-for-unfold [] [].
 coq.copy-clauses-for-unfold [C|CS] [ClauseApp,Clause|L] :-
   coq.env.const C (some B) _,
+  coq.env.global (const C) G,
   ClauseApp = (pi B1 Args Args1 B2 Args2 R\
-    copy (app[{coq.env.global (const C)}|Args]) R :- !,
+    copy (app[G|Args]) R :- !,
       copy B B1,
       std.map Args copy Args1,
       hd-beta B1 Args1 B2 Args2,
       unwind B2 Args2 R),
   Clause = (pi B1\
-    copy {coq.env.global (const C)} B1 :- !, copy B B1),
+    copy G B1 :- !, copy B B1),
   coq.copy-clauses-for-unfold CS L.
 
 % like fold-map, needed for coq-elpi < 1.9
