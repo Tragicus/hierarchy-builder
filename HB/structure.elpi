@@ -479,10 +479,16 @@ declare-coercion SortProjection ClassProjection
   StructureF = indt SIndF,
   coq.env.indt SIndF _ NParamsF _ _ _ _,
   coq.env.projections SIndF [some SortPF, _],
+  if (coq.env.primitive-projection? SortPPF SortPF SortNPF)
+    (PF = primitive (proj SortPPF SortNPF), NF = 0)
+    (PF = global (const SortPF), calc (NParamsF + 1) NF),
   StructureT = indt SIndT,
   coq.env.indt SIndT _ NParamsT _ _ _ _,
   coq.env.projections SIndT [some SortPT, _],
-  coq.equivalent-keys.add (global (const SortPF)) {calc (NParamsF + 1)} (global (const SortPT)) {calc (NParamsT + 1)},
+  if (coq.env.primitive-projection? SortPPT SortPT SortNPT)
+    (PT = primitive (proj SortPPT SortNPT), NT = 0)
+    (PT = global (const SortPT), calc (NParamsT + 1) NT),
+  coq.equivalent-keys.add PF NF PT NT,
 
   w-params.nparams FMLwP NparamsSC,
   acc-clause current (sub-class FC TC SC NparamsSC)
