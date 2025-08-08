@@ -258,38 +258,95 @@ namespace hb {
   %  simpl-tc-instance.abstract-params TKey Args T0 X0 T' X'.
   simpl-tc-instance T I T I :- !.
 
+  pred get-evars i:term, o:list term.
+  get-evars X [X] :- var X, !.
+  get-evars (app L) E :-
+    std.map L get-evars EL,
+    std.flatten EL E.
+  get-evars (fun _ T B) E :-
+    get-evars T ET,
+    (pi x\ get-evars (B x) EB),
+    std.append ET EB E.
+  get-evars (prod _ T B) E :-
+    get-evars T ET,
+    (pi x\ get-evars (B x) EB),
+    std.append ET EB E.
+  get-evars (let _ T X B) E :-
+    get-evars T ET,
+    get-evars X EX,
+    (pi x\ get-evars (B x) EB),
+    std.append EX EB EXB,
+    std.append ET EXB E.
+  get-evars _ [].
+
+  pred mem-var i:list term, o:term.
+  mem-var [X|_] Y :- X == Y.
+  mem-var [_|L] Y :- mem-var L Y.
+
+  pred mem-sealed-goal i:list sealed-goal, o:sealed-goal.
+  mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y.
+  mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
+
+  %FIXME: may be incorrect, two goals may be on the same evar but have their nablas in different orders. Is there a way to get the evar (unapplied) from the goal?
+  pred eq-sealed-goal i:sealed-goal, i:sealed-goal.
+  eq-sealed-goal (nabla G) (nabla G2) :- pi x\ eq-sealed-goal (G x) (G2 x).
+  eq-sealed-goal (nabla G) G2 :- pi x\ eq-sealed-goal (G x) G2.
+  eq-sealed-goal G (nabla G2) :- pi x\ eq-sealed-goal G (G2 x).
+  eq-sealed-goal (seal (goal _ _ _ E _)) (seal (goal _ _ _ E2 _)) :- E == E2.
+
+  %pred get-sealed-goal-evar i:sealed-goal, o:term.
+  %get-sealed-goal-evar (nabla G) T :-
+  %  pi x\ get-sealed-goal-evar (G x) (T' x),
+
   pred has-compiled.
 
   pred compile.subject i:list term, i:string, i:term, i:list term, i:list term, i:list term, i:list term, i:term, i:list term, i:list term, o:prop.
-  compile.subject [_|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
-    pi a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
+  compile.subject [A|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
+    coq.typecheck A T ok,
+    @pi-decl _ T a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
   compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
     std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
-    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, {coq.mk-app ProofHd HArgs}]} C,
+    coq.mk-app K HSArgs KHSArgs,
+    coq.mk-app ProofHd HArgs Proof,
+    (sigma t\ coq.typecheck Proof t ok), %This instantiates the parameters, if applicable
+    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, Proof]} C,
     %std.append HParams HSArgs H,
     if (HArgs = []) (Clause = (C :- 
-      std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
-      std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok)))
-    (Clause = (C :- sigma gs dgs gs'\
+      std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
+      std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok)))
+    (Clause = (C :- sigma ehargs eh\
       std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
-      std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
-      std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok),
-      coq.ltac.collect-goals (app HArgs) gs dgs,
-      %I solve too many goals, but for now whatever.
-      %std.filter gs (h\ not (std.mem H h)) gs',
-      gs' = gs,
-      msolve gs' [])).
+      (sigma g gs\
+        coq.ltac.collect-goals (app [KHSArgs|HParams]) g gs,
+        std.append g gs eh),
+      std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
+      std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok),
+      if (HArgs = [], Params = [], SArgs = [], HParams = [], HSArgs = []) (ehargs = [])
+      (sigma l l0 l1 g gs\
+        std.append HParams [KHSArgs|SArgs] l,
+        std.append Params l l0,
+        std.append HArgs l0 l1,
+        coq.ltac.collect-goals (app l1) g gs,
+        std.append g gs ehargs),
+      std.forall ehargs (g\
+        mem-sealed-goal eh g;
+        sigma gs\
+          coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g gs
+          %Not checking is dangerous...
+          %,gs = []
+        ))).
 
   pred compile.params i:list term, i:string i:term, i:list term, i:list term, i:list term, i:list term, i:term, o:prop.
-  compile.params [_|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
-    pi p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
+  compile.params [P|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
+    coq.typecheck P T ok,
+    @pi-decl _ T p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
   compile.params [] PredName ProofHd HArgs TArgs Params HParams S Clause :-
     coq.safe-dest-app S K SArgs,
     compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
 
   pred compile.telescope i:term, i:term, i:list term, i:list term, o:prop.
-  compile.telescope (prod _ T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
-    pi x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
+  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
+    @pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
   compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause :- !,
     coq.TC.class? Class,
     tc.gref->pred-name Class PredName,
@@ -502,6 +559,7 @@ pred current-mode o:declaration.
 % library, nice-name, object
 pred module-to-export   o:string, o:id, o:modpath.
 pred instance-to-export o:string, o:id, o:constant.
+pred mixin-to-export o:string, o:id, o:constant.
 pred abbrev-to-export   o:string, o:id, o:gref.
 pred clause-to-export   o:string, o:prop.
 

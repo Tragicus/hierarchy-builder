@@ -180,8 +180,8 @@ decl-const-in-struct T Name S STy CS:- std.do![
   log.coq.env.add-const-noimplicits Name S STy @transparent! CS, % Bug coq/coq#11155, could be a Let
   % TODO: fine tune the instance priority, I do not see the API for that now.
 	% FIXME: compute the correct priority
-  @local! => with-locality (coq.TC.declare-instance (const CS) 1), % Bug coq/coq#11155, should be local
-	coq.safe-dest-app STy (global Hd) _,
+  coq.TC.declare-instance (const CS) 1, % Bug coq/coq#11155, should be local
+	prod-last-gref STy Hd,
 	term->cs-pattern T Pat,
 	class-def (class Hd Struct _),
 	coq.elpi.accumulate _ "hb.db" (clause _ _ (has-canonical-structure-on Pat Struct)),
@@ -307,9 +307,11 @@ declare-instance Factory T F Clauses CFL CSL :-
   declare-canonical-instances-from-factory Factory T F Clauses1 CFL CSL,
   if (get-option "export" tt)
      (coq.env.current-library File,
-      std.map {std.append CFL CSL} (x\r\ sigma i c\ x = pr i c, r = instance-to-export File i c) Clauses2)
+      std.map CFL (x\r\ sigma i c\ x = pr i c, r = mixin-to-export File i c) Clauses3,
+      std.map CSL (x\r\ sigma i c\ x = pr i c, r = instance-to-export File i c) Clauses4,
+      std.append Clauses3 Clauses4 Clauses2)
      (Clauses2 = []),
-     std.append Clauses1 Clauses2 Clauses.
+   std.append Clauses1 Clauses2 Clauses.
 
 % [add-mixin T F _ M Cl] adds a constant being the mixin instance for M on type
 % T built from factory F
