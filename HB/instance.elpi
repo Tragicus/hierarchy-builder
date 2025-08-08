@@ -309,8 +309,11 @@ func clauses-for-export list (pair id constant) -> list prop.
 clauses-for-export CL ECL :-
    if (get-option "export" tt)
      (coq.env.current-library File,
-      std.map CL (x\r\ sigma i c\ x = pr i c, r = instance-to-export File i c) ECL)
-     (ECL = []).
+      std.map CFL (x\r\ sigma i c\ x = pr i c, r = mixin-to-export File i c) Clauses3,
+      std.map CSL (x\r\ sigma i c\ x = pr i c, r = instance-to-export File i c) Clauses4,
+      std.append Clauses3 Clauses4 Clauses2)
+     (Clauses2 = []),
+   std.append Clauses1 Clauses2 Clauses.
 
 % [add-mixin T F _ M Cl] adds a constant being the mixin instance for M on type
 % T built from factory F

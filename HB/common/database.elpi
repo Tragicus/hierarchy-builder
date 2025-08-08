@@ -56,6 +56,12 @@ instance-to-export_instance (instance-to-export _ _ M) M.
 func instance-to-export_instance-nice prop -> id.
 instance-to-export_instance-nice (instance-to-export _ M _) M.
 
+func mixin-to-export_instance prop -> constant.
+mixin-to-export_instance (mixin-to-export _ _ M) M.
+
+func mixin-to-export_instance-nice prop -> id.
+mixin-to-export_instance-nice (mixin-to-export _ M _) M.
+
 func abbrev-to-export_name prop -> id.
 abbrev-to-export_name (abbrev-to-export _ N _) N.
 func abbrev-to-export_body prop -> term.
