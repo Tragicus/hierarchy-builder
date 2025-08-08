@@ -340,11 +340,13 @@ mk-generic-coercion _ Structure Constructor Args Clause :-
   std.rev Args ArgsRev,
   mk-app Constructor ArgsRev Cargs,
   mk-app Structure ArgsRev Sargs,
+  coq.typecheck Cargs (prod _ T _) ok,
   Clause =
-    (pi ctx v t e r c w wt g g'\ (coercion ctx v t Sargs r :-
+    (pi ctx v t r v' c w wt g g'\ (coercion ctx v t Sargs r :-
 		% N.B. I have to *not* use r here, otherwise elpi instanciates r temporarily with "app X", which
 		% fails because r is typechecked immediately and "app X" does not typecheck.
-      mk-app Cargs [v, c] w, !,
+      coq.elaborate-skeleton v T v' ok,
+      mk-app Cargs [v', c] w, !,
 		  coq.typecheck w wt ok,
       coq.ltac.collect-goals c [g] [], !,
       % TODO: fine tune the tactic below

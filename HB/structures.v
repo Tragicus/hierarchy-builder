@@ -286,6 +286,46 @@ namespace hb {
   mem-var [X|_] Y :- X == Y, !.
   mem-var [_|L] Y :- mem-var L Y.
 
+  pred get-evars i:term, o:list term.
+  get-evars X [X] :- var X, !.
+  get-evars (app L) E :-
+    std.map L get-evars EL,
+    std.flatten EL E.
+  get-evars (fun _ T B) E :-
+    get-evars T ET,
+    (pi x\ get-evars (B x) EB),
+    std.append ET EB E.
+  get-evars (prod _ T B) E :-
+    get-evars T ET,
+    (pi x\ get-evars (B x) EB),
+    std.append ET EB E.
+  get-evars (let _ T X B) E :-
+    get-evars T ET,
+    get-evars X EX,
+    (pi x\ get-evars (B x) EB),
+    std.append EX EB EXB,
+    std.append ET EXB E.
+  get-evars _ [].
+
+  pred mem-var i:list term, o:term.
+  mem-var [X|_] Y :- X == Y.
+  mem-var [_|L] Y :- mem-var L Y.
+
+  pred mem-sealed-goal i:list sealed-goal, o:sealed-goal.
+  mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y.
+  mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
+
+  %FIXME: may be incorrect, two goals may be on the same evar but have their nablas in different orders. Is there a way to get the evar (unapplied) from the goal?
+  pred eq-sealed-goal i:sealed-goal, i:sealed-goal.
+  eq-sealed-goal (nabla G) (nabla G2) :- pi x\ eq-sealed-goal (G x) (G2 x).
+  eq-sealed-goal (nabla G) G2 :- pi x\ eq-sealed-goal (G x) G2.
+  eq-sealed-goal G (nabla G2) :- pi x\ eq-sealed-goal G (G2 x).
+  eq-sealed-goal (seal (goal _ _ _ E _)) (seal (goal _ _ _ E2 _)) :- E == E2.
+
+  %pred get-sealed-goal-evar i:sealed-goal, o:term.
+  %get-sealed-goal-evar (nabla G) T :-
+  %  pi x\ get-sealed-goal-evar (G x) (T' x),
+
   pred has-compiled.
 
   func compile.subject list term, string, term, list term, list term, list term, list term, term, list term, list term -> prop.
@@ -544,6 +584,7 @@ pred current-mode o:declaration.
 % library, nice-name, object
 pred module-to-export   o:string, o:id, o:modpath.
 pred instance-to-export o:string, o:id, o:constant.
+pred mixin-to-export o:string, o:id, o:constant.
 pred abbrev-to-export   o:string, o:id, o:gref.
 pred clause-to-export   o:string, o:prop.
 
