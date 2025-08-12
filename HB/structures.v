@@ -21,7 +21,7 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
 
 (* ********************* structures ****************************** *)
-From elpi Require Import elpi coercion cs tc.
+From elpi Require Import elpi coercion tc.
 
 TC.AddAllClasses.
 TC.AddAllInstances.
@@ -987,7 +987,6 @@ HB.structure Definition StructureName params :=
 
 #[arguments(raw)] Elpi Command HB.structure.
 Elpi Accumulate Db coercion.db.
-Elpi Accumulate Db cs.db.
 Elpi Accumulate Db tc.db.
 Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
