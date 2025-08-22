@@ -433,6 +433,33 @@ mk-coe-structure-body StructureF StructureT TC Coercion SortProjection ClassProj
      lp:PackPH (lp:SortP s) (lp:CoercionP (lp:SortP s) (lp:ClassP s)) }},
 ].
 
+pred mk-rev-coe-structure-class-body
+  i:classname, % From factory
+  i:structure, % From structure
+  i:structure, % To structure
+  i:factoryname, % To factory (for nparams)
+  i:term, % structure coercion
+  i:term, % sort projection
+  i:term, % class projection
+  i:list term, i:term, % Params, T
+  i:list (w-args mixinname),
+  o:term.
+mk-rev-coe-structure-class-body FC StructureF StructureT TC SCoercion _ ClassProjection
+    Params _T _ SCoeBody :- std.do! [
+  get-structure-sort-projection StructureT SortProjection,
+  if (SortProjection = primitive _) (SortP = SortProjection)
+    (mk-app SortProjection {coq.mk-n-holes {factory-nparams TC} } SortP),
+
+  mk-app (global StructureF) Params StructureP,
+  mk-app (global FC) Params FCP,
+  if (ClassProjection = primitive _) (ClassP = ClassProjection)
+    (mk-app ClassProjection Params ClassP),
+  mk-app SCoercion Params SCoercionP,
+
+  SCoeBody = {{ fun s : lp:StructureP => lp:ClassP s : lp:FCP (lp:SortP (lp:SCoercionP s)) }},
+].
+
+
 % [declare-coercion P1 P2 C1 C2] declares a structure and a class coercion
 % from C1 to C2 given P1 P2 the two projections from the structure of C1
 pred declare-coercion i:term, i:term, i:hbclass, i:hbclass.
@@ -444,6 +471,7 @@ declare-coercion SortProjection ClassProjection
   CName is ModNameF ^ "_class__to__" ^ ModNameT ^ "_class",
   SName is ModNameF ^ "__to__" ^ ModNameT,
   SCName is ModNameF ^ "__to__" ^ ModNameT ^ "_class",
+  SRCName is ModNameT ^ "__to__" ^ ModNameF ^ "_class",
 
   if-verbose (coq.say {header} "declare coercion" SName),
 
@@ -478,6 +506,14 @@ declare-coercion SortProjection ClassProjection
   log.coq.env.add-const-noimplicits SCName SCCoeBody' SCTy @transparent! SCC,
   coq.TC.declare-instance (const SCC) 1,
 
+  w-params.then FMLwP mk-fun ignore
+    (mk-rev-coe-structure-class-body FC StructureF StructureT TC (global (const SC)) SortProjection ClassProjection)
+    SRCCoeBody,
+
+  std.assert-ok! (coq.elaborate-skeleton SRCCoeBody SRCTy SRCCoeBody') ErrorMessage,
+  log.coq.env.add-const-noimplicits SRCName SRCCoeBody' SRCTy @transparent! SRCC,
+  coq.TC.declare-instance (const SRCC) 1,
+
   StructureF = indt SIndF,
   coq.env.indt SIndF _ NParamsF _ _ _ _,
   coq.env.projections SIndF [some SortPF, _],
@@ -496,42 +532,53 @@ declare-coercion SortProjection ClassProjection
   acc-clause current (sub-class FC TC SC NparamsSC)
 ].
 
-pred join-body i:int, i:int, i:structure, i:term, i:term, i:term, i:term, i:term,
+pred join-body i:structure, i:classname, i:classname, i:term, i:term, i:term, i:term,
   i:list term, i:name, i:term, i:(term -> A), o:term.
-join-body N1 N2 S3 S2_Pack S1_sort S3_to_S1 S2_class S3_to_S2
-  P N _Ty _F (fun N S3P Pack) :- !,
-  mk-app (global S3) P S3P, !,
-  @pi-decl N S3P s\
-  sigma S3_to_S1_Ps S3_to_S2_Ps S1_sortS3Ps S2_classS3Ps Holes1 Holes2 HS3_to_S1_Ps \ std.do! [
-    coq.mk-n-holes N2 Holes2,
-    coq.mk-n-holes N1 Holes1,
-    mk-app S3_to_S1 {std.append P [s]} S3_to_S1_Ps,
-    coq.elaborate-skeleton {mk-app S1_sort {std.append Holes1 [S3_to_S1_Ps]} } _ S1_sortS3Ps ok,
-    mk-app S3_to_S2 {std.append P [s]} S3_to_S2_Ps,
-    mk-app S2_class {std.append Holes2 [S3_to_S2_Ps]} S2_classS3Ps,
-    mk-app S2_Pack {std.append Holes2 [S1_sortS3Ps, S2_classS3Ps]} (Pack s)
-  ].
+join-body S3 C1 C2 S1_sort S3_to_S1 S2_class S3_to_S2
+  P _N _Ty _F J1 :- !,
+  mk-app (global S3) P S3P,
+  mk-app S3_to_S1 P S3_to_S1P,
+  mk-app S3_to_S2 P S3_to_S2P,
+
+  factory-nparams C1 N1,
+  factory-nparams C2 N2,
+
+  mk-app (global C2) {coq.mk-n-holes N2} C2P,
+
+  if (S1_sort = primitive _) (S1_sortP = S1_sort)
+    (mk-app S1_sort {coq.mk-n-holes N1} S1_sortP),
+  if (S2_class = primitive _) (S2_classP = S2_class)
+    (mk-app S2_class {coq.mk-n-holes N2} S2_classP),
+
+  J1 = {{ fun s : lp:S3P => lp:S2_classP (lp:S3_to_S2P s) : lp:C2P (lp:S1_sortP (lp:S3_to_S1P s)) }}.
 
 pred declare-join i:hbclass, i:pair hbclass hbclass, o:prop.
 declare-join (class C3 S3 MLwP3) (pr (class C1 S1 _) (class C2 S2 _)) (join C1 C2 C3) :-
-  Name is "join_" ^ {gref->modname S3 2 "_"} ^
+  Name1 is "join_" ^ {gref->modname S3 2 "_"} ^
+    "_between_" ^ {gref->modname S1 2 "_"} ^ "_and_" ^ {gref->modname S2 2 "_"},
+  Name2 is "join_" ^ {gref->modname S3 2 "_"} ^
     "_between_" ^ {gref->modname S1 2 "_"} ^ "_and_" ^ {gref->modname S2 2 "_"},
 
   get-structure-coercion S3 S2 S3_to_S2,
   get-structure-coercion S3 S1 S3_to_S1,
   get-structure-sort-projection S1 S1_sort,
+  get-structure-class-projection S1 S1_class,
+  get-structure-sort-projection S2 S2_sort,
   get-structure-class-projection S2 S2_class,
-  get-constructor S2 S2_Pack,
 
-  factory->nparams C1 N1,
-  factory->nparams C2 N2,
+  if-verbose (coq.say {header} "declare unification hints" Name1 "and" Name2),
 
-  if-verbose (coq.say {header} "declare unification hint" Name),
-  w-params.fold MLwP3 mk-fun (join-body N1 N2 S3
-    (global S2_Pack) S1_sort S3_to_S1 S2_class S3_to_S2) JoinBody,
-  std.assert-ok! (coq.typecheck JoinBody Ty) "declare-join: JoinBody illtyped",
-  log.coq.env.add-const-noimplicits Name JoinBody Ty @transparent! J,
-  log.coq.CS.declare-instance J.
+  w-params.fold MLwP3 mk-fun (join-body S3 C1 C2
+     S1_sort S3_to_S1 S2_class S3_to_S2) JoinBody1,
+  std.assert-ok! (coq.typecheck JoinBody1 Ty1) "declare-join: JoinBody illtyped",
+  log.coq.env.add-const-noimplicits Name1 JoinBody1 Ty1 @transparent! J1,
+  coq.TC.declare-instance (const J1) 1,
+
+  w-params.fold MLwP3 mk-fun (join-body S3 C2 C1
+     S2_sort S3_to_S2 S1_class S3_to_S1) JoinBody2,
+  std.assert-ok! (coq.typecheck JoinBody2 Ty2) "declare-join: JoinBody illtyped",
+  log.coq.env.add-const-noimplicits Name2 JoinBody2 Ty2 @transparent! J2,
+  coq.TC.declare-instance (const J2) 1.
 
 % TODO: this works under the invariant: we never have two classes that
 % contain exactly the same mixins. HB.structure should enforce this
