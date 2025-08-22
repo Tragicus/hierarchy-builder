@@ -168,6 +168,10 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
      
 ].
 
+func ty->class term -> term.
+ty->class (prod _ _ T) C :- !, pi x\ ty->class (T x) C.
+ty->class T C :- coq.safe-dest-app T C _.
+
 func decl-const-in-struct term, gref, string, term, term, constant ->.
 decl-const-in-struct T _Class Name S STy CS:- std.do![
   if (ground_term S) (S1 = S, STy1 = STy)
@@ -177,7 +181,7 @@ decl-const-in-struct T _Class Name S STy CS:- std.do![
   log.coq.env.add-const-noimplicits Name S1 STy1 @transparent! CS, % Bug coq/coq#11155, could be a Let
   %TODO: compute the right priority
   coq.TC.declare-instance (const CS) 1, % Bug coq/coq#11155, should be local
-	coq.safe-dest-app STy (global Hd) _,
+	ty->class STy1 (global Hd),
 	term->cs-pattern T Pat,
 	class-def (class Hd Struct _),
 	coq.elpi.accumulate _ "hb.db" (clause _ _ (has-canonical-structure-on Pat Struct)),
