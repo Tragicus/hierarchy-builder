@@ -259,7 +259,7 @@ mk-phant-term.mixins Target Src CN PF Params N Ty MLwA Out :- std.do! [
 
 mk-phant-term.mixins.aux T Params C (indt CN) PF X :- std.do! [
   get-constructor (indt CN) KC,
-  synthesis.infer-all-gref-deps Params T KC KCM,
+  synthesis.infer-all-gref->deps Params T KC KCM,
 	coq.env.projections CN Projs,
 	std.append Params [T, C] ParamsC,
 	std.map Projs (p\ r\ sigma Proj\ p = some Proj, r = app [global (const Proj)|ParamsC]) Args,

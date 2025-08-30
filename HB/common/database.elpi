@@ -375,13 +375,13 @@ mixin-src->has-mixin-instance (mixin-src (sort U) M I) (has-mixin-instance (cs-s
 % and create the necessary unify condition for each arguments
 % and at the end returns the mixin-src clause with all the conditions
 func mixin-instance-type->mixin-src.aux
-  i:list term, % list of arguments
-  i:term, % head of the original application
-  i:mixinname, % name of mixin
-  i:term, % instance body
-  i:list prop, % decl list
-  i:list prop, % Cond list
-  o:prop.
+  list term, % list of arguments
+  term, % head of the original application
+  mixinname, % name of mixin
+  term, % instance body
+  list prop, % decl list
+  list prop -> % Cond list
+  prop.
 mixin-instance-type->mixin-src.aux [] T M I Decls Cond (mixin-src T M I :- std.do! DeclsCond) :-
 	std.append Decls Cond DeclsCond.
 mixin-instance-type->mixin-src.aux [A|Args] T M I Decls Cond  (pi a \ C a) :-
@@ -395,12 +395,12 @@ mixin-instance-type->mixin-src.aux [A|Args] T M I Decls Cond  (pi a \ C a) :-
 % mixin-src clause with eventual conditions regarding its parameters
 :index (1)
 func mixin-instance-type->mixin-src
-  i:term, % type of the instance Ty
-  i:mixinname, % name of mixin
-  i:term, % instance body I of type Ty
-	i:list prop,
-  i:list prop, % Cond list
-  o:prop.
+  term, % type of the instance Ty
+  mixinname, % name of mixin
+  term, % instance body I of type Ty
+	list prop,
+  list prop -> % Cond list
+  prop.
 
 mixin-instance-type->mixin-src (app _ as F) M I Decls' Cond C :-
   factory? F (triple _ _ Subject),
@@ -433,11 +433,10 @@ get-canonical-instances TyTrm StructL :-
   coq.CS.db-for _ Pat DBGTyL,
   std.map-filter DBGTyL get-cs-instance StructL.
 
-func has-CS-instance? term, structure ->.
+pred has-CS-instance? i:term, i:structure.
 has-CS-instance? TyTerm (indt Struct) :-
   term->cs-pattern TyTerm Pat,
-  has-canonical-structure-on Pat (indt Struct)
-].
+  has-canonical-structure-on Pat (indt Struct).
 
 pred structure-nparams i:structure, o:int.
 structure-nparams Structure NParams :-

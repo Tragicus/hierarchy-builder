@@ -246,7 +246,6 @@ builder->term Ps T Src Tgt B :- !, std.do! [
 % then TFX := fun xs m_0 .. m_{i-1}     m_{i+1} .. m_n ys
 %            => F xs m_0 .. m_{i-1} X_i m_{i+1} .. m_n ys
 % thus instanciating an abstraction on mixin M_i with X_i
-pred instantiate-all-these-mixin-args i:term, i:term, i:list mixinname, o:term.
 func instantiate-all-these-mixin-args term, term, list mixinname -> term.
 instantiate-all-these-mixin-args F T [M|ML] R :-
   if (mixin-for T M X) true (coq.error "HB: Unable to find mixin" {nice-gref->string M} "on subject" {coq.term->string T}), !,
