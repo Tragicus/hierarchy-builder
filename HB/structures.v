@@ -114,108 +114,108 @@ namespace hb {
     sorted-diff [X|L] [X|L'] R :-
       sorted-diff L L' R.
 
-    pred get-args-to-compile.index i:term, o:int.
-    get-args-to-compile.index (app [Hd|_]) N :- get-args-to-compile.index Hd N.
-
-    pred get-args-to-compile.aux i:term, o:list int.
-    get-args-to-compile.aux (app Args) [I] :-
-      std.last Args Pat,
-      coq.safe-dest-app Pat Hd _,
-      get-args-to-compile.index Hd I.
-    get-args-to-compile.aux (fun _ T Body) L :-
-      get-args-to-compile.aux T LT,
-      (pi x\ get-args-to-compile.aux (Body x) LB),
-      std.append LT LB L.
-    get-args-to-compile.aux _ [].
-
-    pred get-args-to-compile.gather i:term, i:int, o:list int.
-    get-args-to-compile.gather (prod _ _ T) N L :-
-      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L.
-    get-args-to-compile.gather (app [_|Args]) _ L :-
-      std.rev Args [Pat|Params], !,
-      if (Pat = app [_|Args']) (std.append Args' Params T) (T = Params),
-      std.map T get-args-to-compile.aux I,
-      std.flatten I L.
-
-    pred get-args-to-compile i:term, o:list int.
-    get-args-to-compile T L :-
-      get-args-to-compile.gather T 0 L1 Avoid',
-      mergesort L1 L2,
-      undup L2 L3,
-      mergesort Avoid' Avoid'',
-      undup Avoid'' Avoid,
-      sorted-diff L3 Avoid L.
+    %pred get-args-to-compile.index i:term, o:int.
+    %get-args-to-compile.index (app [Hd|_]) N :- get-args-to-compile.index Hd N.
+%
+%    pred get-args-to-compile.aux i:term, o:list int.
+%    get-args-to-compile.aux (app Args) [I] :-
+%      std.last Args Pat,
+%      coq.safe-dest-app Pat Hd _,
+%      get-args-to-compile.index Hd I.
+%    get-args-to-compile.aux (fun _ T Body) L :-
+%      get-args-to-compile.aux T LT,
+%      (pi x\ get-args-to-compile.aux (Body x) LB),
+%      std.append LT LB L.
+%    get-args-to-compile.aux _ [].
+%
+%    pred get-args-to-compile.gather i:term, i:int, o:list int.
+%    get-args-to-compile.gather (prod _ _ T) N L :-
+%      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L.
+%    get-args-to-compile.gather (app [_|Args]) _ L :-
+%      std.rev Args [Pat|Params], !,
+%      if (Pat = app [_|Args']) (std.append Args' Params T) (T = Params),
+%      std.map T get-args-to-compile.aux I,
+%      std.flatten I L.
+%
+%    pred get-args-to-compile i:term, o:list int.
+%    get-args-to-compile T L :-
+%      get-args-to-compile.gather T 0 L1 Avoid',
+%      mergesort L1 L2,
+%      undup L2 L3,
+%      mergesort Avoid' Avoid'',
+%      undup Avoid'' Avoid,
+%      sorted-diff L3 Avoid L.
 
 
     % [translate-ty T Args TSort TClass] asserts that T is a type that
     % ends in a record with two projections (our best approximation for structures declared by us). It produces two
     % types TSort and TClass obtained from T by replacing the structure with its sort and class projection respectively.
-    pred translate-ty i:term, i:list term, o:term, o:term -> term.
-    translate-ty (prod N T TBody) Args (prod N T TSort) (xs\ prod N T (TClass xs)) :-
-      pi x\ translate-ty (TBody x) [x|Args] (TSort x) (xs\ TClass xs x).
-    translate-ty T Args TSort TClass :- std.do! [
-      coq.safe-dest-app T (global (indt S)) Params,
-      coq.env.record? S _,
-      coq.env.projections S [some SortP, some ClassP],
-      @pi-decl _ T x\ sigma Paramsx SortPx ClassPx TClass'\ std.do! [
-        std.append Params [x] Paramsx,
-        if (coq.env.primitive-projection? SortPP SortP SortPN)
-          (SortPx = app [primitive (proj SortPP SortPN), x])
-          (coq.mk-app (global (const SortP)) Paramsx SortPx),
-        coq.mk-app (global (const ClassP)) Paramsx ClassPx,
-        coq.typecheck SortPx TSort ok,
-        coq.typecheck ClassPx TClass' ok,
-        pi xs\ sigma args xargs\
-          std.rev Args args,
-          coq.mk-app xs args xargs,
-          (copy SortPx xargs) => copy TClass' (TClass xs)] ].
-
-    % [mk-copy-clauses T X Xs Xc Args CopyClauses BuildSX] fully applies (X : T), Xs and Xc
-    % to their arguments, asserts that T ends in a record S and produces copy clauses turning S.sort X into Xs,
-    % S.class X into Xc and X into S.Pack Xs Xc. BuildSX is the term we copy X to when it is not applied.
-    pred mk-copy-clauses i:term, i:term, i:term, i:term, i:list term, o:list prop, o:term.
-    mk-copy-clauses (prod N T' T) X Xs Xc Args CC (fun N T' (x\ BuildSX x)) :-
-      pi x\ sigma CCx\ mk-copy-clauses (T x) X Xs Xc [x|Args] CCx (BuildSX x),
-        ((CCx = [C1 x, C2 x, C3 x, C4 x], CC = [(pi x\ C1 x), (pi x\ C2 x), (pi x\ C3 x), (pi x\ C4 x)]);
-          (CCx = [C1 x, C2 x], CC = [(pi x\ C1 x), (pi x\ C2 x)])).
-
-    mk-copy-clauses T X Xs Xc Args' CC BuildSX :- std.do! [
-      coq.safe-dest-app T (global (indt S)) Params,
-      coq.env.indt S _ _ _ _ [BuildS] _,
-      coq.env.projections S [some SortP, some ClassP],
-      std.rev Args' Args,
-      coq.mk-app X Args XArgs,
-      coq.mk-app Xs Args XsArgs,
-      coq.mk-app Xc Args XcArgs,
-      std.append Params [XArgs] ParamsX,
-      coq.mk-app (global (const SortP)) ParamsX SortPX,
-      coq.mk-app (global (const ClassP)) ParamsX ClassPX,
-      if (coq.env.primitive-projection? SortPP SortP SortPN,
-          coq.env.primitive-projection? ClassPP ClassP ClassPN)
-        (SortPX' = app [primitive (proj SortPP SortPN), XArgs],
-          ClassPX' = app [primitive (proj ClassPP ClassPN), XArgs],
-          CC = [ (copy SortPX XsArgs :- !),
-          (copy ClassPX XcArgs :- !),
-          (copy SortPX' XsArgs :- !),
-          (copy ClassPX' XcArgs :- !) ])
-        (CC = [ (copy SortPX XsArgs :- !),
-          (copy ClassPX XcArgs :- !) ]),
-      coq.mk-app (global (indc BuildS)) {std.append Params [XsArgs, XcArgs]} BuildSX ].
-
-    pred check-progress i:term, i:term.
-    check-progress (prod N T B1) (prod _ _ B2) :- !,
-      @pi-decl N T x\ check-progress (B1 x) (B2 x).
-    check-progress (app L1) (app L2) :- !,
-      std.last L1 T1,
-      std.last L2 T2,
-      not (T1 = T2).
-
-    pred avoid-pattern i:term, i:term.
-    avoid-pattern Pat (prod N T B) :- !,
-      @pi-decl N T x\ avoid-pattern Pat (B x).
-    avoid-pattern Pat (app L) :- !,
-      std.last L X,
-      not (Pat = X).
+%    pred translate-ty i:term, i:list term, o:term, o:term -> term.
+%    translate-ty (prod N T TBody) Args (prod N T TSort) (xs\ prod N T (TClass xs)) :-
+%      pi x\ translate-ty (TBody x) [x|Args] (TSort x) (xs\ TClass xs x).
+%    translate-ty T Args TSort TClass :- std.do! [
+%      coq.safe-dest-app T (global (indt S)) Params,
+%      coq.env.record? S _,
+%      coq.env.projections S [some SortP, some ClassP],
+%      @pi-decl _ T x\ sigma Paramsx SortPx ClassPx TClass'\ std.do! [
+%        std.append Params [x] Paramsx,
+%        if (coq.env.primitive-projection? SortPP SortP SortPN)
+%          (SortPx = app [primitive (proj SortPP SortPN), x])
+%          (coq.mk-app (global (const SortP)) Paramsx SortPx),
+%        coq.mk-app (global (const ClassP)) Paramsx ClassPx,
+%        coq.typecheck SortPx TSort ok,
+%        coq.typecheck ClassPx TClass' ok,
+%        pi xs\ sigma args xargs\
+%          std.rev Args args,
+%          coq.mk-app xs args xargs,
+%          (copy SortPx xargs) => copy TClass' (TClass xs)] ].
+%
+%    % [mk-copy-clauses T X Xs Xc Args CopyClauses BuildSX] fully applies (X : T), Xs and Xc
+%    % to their arguments, asserts that T ends in a record S and produces copy clauses turning S.sort X into Xs,
+%    % S.class X into Xc and X into S.Pack Xs Xc. BuildSX is the term we copy X to when it is not applied.
+%    pred mk-copy-clauses i:term, i:term, i:term, i:term, i:list term, o:list prop, o:term.
+%    mk-copy-clauses (prod N T' T) X Xs Xc Args CC (fun N T' (x\ BuildSX x)) :-
+%      pi x\ sigma CCx\ mk-copy-clauses (T x) X Xs Xc [x|Args] CCx (BuildSX x),
+%        ((CCx = [C1 x, C2 x, C3 x, C4 x], CC = [(pi x\ C1 x), (pi x\ C2 x), (pi x\ C3 x), (pi x\ C4 x)]);
+%          (CCx = [C1 x, C2 x], CC = [(pi x\ C1 x), (pi x\ C2 x)])).
+%
+%    mk-copy-clauses T X Xs Xc Args' CC BuildSX :- std.do! [
+%      coq.safe-dest-app T (global (indt S)) Params,
+%      coq.env.indt S _ _ _ _ [BuildS] _,
+%      coq.env.projections S [some SortP, some ClassP],
+%      std.rev Args' Args,
+%      coq.mk-app X Args XArgs,
+%      coq.mk-app Xs Args XsArgs,
+%      coq.mk-app Xc Args XcArgs,
+%      std.append Params [XArgs] ParamsX,
+%      coq.mk-app (global (const SortP)) ParamsX SortPX,
+%      coq.mk-app (global (const ClassP)) ParamsX ClassPX,
+%      if (coq.env.primitive-projection? SortPP SortP SortPN,
+%          coq.env.primitive-projection? ClassPP ClassP ClassPN)
+%        (SortPX' = app [primitive (proj SortPP SortPN), XArgs],
+%          ClassPX' = app [primitive (proj ClassPP ClassPN), XArgs],
+%          CC = [ (copy SortPX XsArgs :- !),
+%          (copy ClassPX XcArgs :- !),
+%          (copy SortPX' XsArgs :- !),
+%          (copy ClassPX' XcArgs :- !) ])
+%        (CC = [ (copy SortPX XsArgs :- !),
+%          (copy ClassPX XcArgs :- !) ]),
+%      coq.mk-app (global (indc BuildS)) {std.append Params [XsArgs, XcArgs]} BuildSX ].
+%
+%    pred check-progress i:term, i:term.
+%    check-progress (prod N T B1) (prod _ _ B2) :- !,
+%      @pi-decl N T x\ check-progress (B1 x) (B2 x).
+%    check-progress (app L1) (app L2) :- !,
+%      std.last L1 T1,
+%      std.last L2 T2,
+%      not (T1 = T2).
+%
+%    pred avoid-pattern i:term, i:term.
+%    avoid-pattern Pat (prod N T B) :- !,
+%      @pi-decl N T x\ avoid-pattern Pat (B x).
+%    avoid-pattern Pat (app L) :- !,
+%      std.last L X,
+%      not (Pat = X).
 
     %pred abstract-params i:term, i:list term, i:term, i:term, o:term, o:term.
     %abstract-params (prod N Ty TBody) [P|Args] T X RT RX :-
@@ -281,11 +281,6 @@ namespace hb {
     std.append ET EXB E.
   get-evars _ [].
 
-  func mem-var list term -> term.
-  mem-var [] _.
-  mem-var [X|_] Y :- X == Y, !.
-  mem-var [_|L] Y :- mem-var L Y.
-
   pred get-evars i:term, o:list term.
   get-evars X [X] :- var X, !.
   get-evars (app L) E :-
@@ -307,8 +302,8 @@ namespace hb {
     std.append ET EXB E.
   get-evars _ [].
 
-  pred mem-var i:list term, o:term.
-  mem-var [X|_] Y :- X == Y.
+  func mem-var list term -> term.
+  mem-var [X|_] Y :- X == Y, !.
   mem-var [_|L] Y :- mem-var L Y.
 
   pred mem-sealed-goal i:list sealed-goal, o:sealed-goal.
@@ -329,40 +324,52 @@ namespace hb {
   pred has-compiled.
 
   func compile.subject list term, string, term, list term, list term, list term, list term, term, list term, list term -> prop.
-  compile.subject [_|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
-    pi a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
+  compile.subject [A|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
+    coq.typecheck A T ok,
+    @pi-decl _ T a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
   compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
     std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
-    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, {coq.mk-app ProofHd HArgs}]} C,
-    std.append HParams HSArgs H,
+    coq.mk-app K HSArgs KHSArgs,
+    coq.mk-app ProofHd HArgs Proof,
+    (sigma t\ coq.typecheck Proof t ok), %This instantiates the parameters, if applicable
+    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, Proof]} C,
+    %std.append HParams HSArgs H,
     if (HArgs = []) (Clause = (C :- 
-      std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
-      std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok)))
-    (Clause = (pi gs dgs gs' hargs ehargs' ehargs ehparams ehsargs eh' eh\ C :-
+      std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
+      std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok)))
+    (Clause = (C :- sigma ehargs eh\
       std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
-      std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
-      std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok),
-      std.map HArgs get-evars ehargs',
-      std.flatten ehargs' ehargs,
-      std.map HParams get-evars ehparams,
-      std.map HSArgs get-evars ehsargs,
-      std.append ehparams ehsargs eh', 
-      std.flatten eh' eh,
-      std.filter ehargs (x\ not (mem-var eh x)) hargs,
-      (hargs = []; 
-        (coq.ltac.collect-goals (app hargs) gs dgs,
-        std.forall gs (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []))))).
+      (sigma g gs\
+        coq.ltac.collect-goals (app [KHSArgs|HParams]) g gs,
+        std.append g gs eh),
+      std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
+      std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok),
+      if (HArgs = [], Params = [], SArgs = [], HParams = [], HSArgs = []) (ehargs = [])
+      (sigma l l0 l1 g gs\
+        std.append HParams [KHSArgs|SArgs] l,
+        std.append Params l l0,
+        std.append HArgs l0 l1,
+        coq.ltac.collect-goals (app l1) g gs,
+        std.append g gs ehargs),
+      std.forall ehargs (g\
+        mem-sealed-goal eh g;
+        sigma gs\
+          coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g gs
+          %Not checking is dangerous...
+          %,gs = []
+        ))).
 
   func compile.params list term, string, term, list term, list term, list term, list term, term -> prop.
-  compile.params [_|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
-    pi p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
+  compile.params [P|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
+    coq.typecheck P T ok,
+    @pi-decl _ T p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
   compile.params [] PredName ProofHd HArgs TArgs Params HParams S Clause :-
     coq.safe-dest-app S K SArgs,
     compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
 
   func compile.telescope term, term, list term, list term -> prop.
-  compile.telescope (prod _ T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
-    pi x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
+  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
+    @pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
   compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause :- !,
     coq.TC.class? Class,
     tc.gref->pred-name Class PredName,

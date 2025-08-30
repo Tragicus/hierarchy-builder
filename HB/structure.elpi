@@ -86,11 +86,8 @@ declare Module BSkel Sort :- std.do! [
 
   log.coq.env.begin-module "Exports" none,
 
-  w-params.nparams MLwP NParams,
-
   if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
     with-locality (log.coq.CS.declare-instance ConstPackS), 
-  class-def CurrentClass => private.sort-cs-catch-all ClassName NParams,
 
 	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make {w-params.nparams MLwP} mode-output} [mode-input]},
 	coq.TC.declare-class ClassName,
@@ -126,11 +123,12 @@ declare Module BSkel Sort :- std.do! [
   %]),
 
   if-verbose (coq.say {header} "making coercion from type to target"),
-  if (synthesis.infer-coercion-tgt MLwP CoeClass)
+  (synthesis.infer-coercion-tgt MLwP CoeClass; true),
+  if (not (var CoeClass), SortProjection = global _)
     (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
     private.declare-sort-coercion CoeClass Structure SortProjection)
-	 (if-arg-sort (private.declare-sort-coercion-elpi (global Structure) (global (const ArgSortCst))),
-    private.declare-sort-coercion-elpi (global Structure) SortProjection),
+	 (if-arg-sort (private.declare-sort-coercion-elpi Structure (global (const ArgSortCst))),
+    private.declare-sort-coercion-elpi Structure SortProjection),
 
   private.declare-generic-coercion-elpi Structure,
 

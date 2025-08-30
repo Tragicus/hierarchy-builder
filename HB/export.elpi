@@ -99,7 +99,7 @@ instance-in-module PM (instance-to-export _ _ C) :-
   coq.gref->path (const C) PC,
   prefixL PM PC.
 
-func mixin-in-module list string, prop ->.
+pred mixin-in-module i:list string, i:prop.
 mixin-in-module PM (mixin-to-export _ _ C) :-
   coq.gref->path (const C) PC,
   std.appendR PM _ PC. % sublist
