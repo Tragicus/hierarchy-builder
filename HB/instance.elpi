@@ -128,7 +128,7 @@ declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS|L]
   abstract-holes.main S SC,
   std.assert-ok! (coq.typecheck SC SCTy) "declare-all-on-type-constructor: badly closed",
   
-  decl-const-in-struct T Name SC SCTy CS,
+  decl-const-in-struct T Class Name SC SCTy CS,
 
   Clauses => declare-all-on-type-constructor TK Rest L.
 
@@ -168,16 +168,15 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
      
 ].
 
-func decl-const-in-struct gref, string, term, term, constant ->.
-decl-const-in-struct T Class Name S STy CS:- std.do![
+func decl-const-in-struct term, gref, string, term, term, constant ->.
+decl-const-in-struct T _Class Name S STy CS:- std.do![
   if (ground_term S) (S1 = S, STy1 = STy)
     (abstract-holes.main S S1,
      std.assert-ok! (coq.typecheck S1 STy1) "HB: structure instance illtyped after generalizing over holes"),
 
   log.coq.env.add-const-noimplicits Name S1 STy1 @transparent! CS, % Bug coq/coq#11155, could be a Let
-  coq.TC.get-inst-prio Class (const CS) Prio,
-  if (Prio = tc-priority-given N) (true) (Prio = tc-priority-computed N),
-  with-locality (coq.TC.declare-instance (const CS) N), % Bug coq/coq#11155, should be local
+  %TODO: compute the right priority
+  coq.TC.declare-instance (const CS) 1, % Bug coq/coq#11155, should be local
 	coq.safe-dest-app STy (global Hd) _,
 	term->cs-pattern T Pat,
 	class-def (class Hd Struct _),
