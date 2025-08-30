@@ -220,15 +220,15 @@ namespace hb {
       std.last L X,
       not (Pat = X).
 
-    pred abstract-params i:term, i:list term, i:term, i:term, o:term, o:term.
-    abstract-params (prod N Ty TBody) [P|Args] T X RT RX :-
-      (@pi-decl N Ty x\ abstract-params (TBody x) Args T X (T'' x) (X'' x),
-        copy P x => (copy (T'' x) (T' x),
-          copy (X'' x) (X' x))
-      ),
-      RT = prod N Ty (x\ prod _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ T' x)),
-      RX = fun N Ty (x\ fun _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ X' x)).
-    abstract-params _ _ T X T X.
+    %pred abstract-params i:term, i:list term, i:term, i:term, o:term, o:term.
+    %abstract-params (prod N Ty TBody) [P|Args] T X RT RX :-
+    %  (@pi-decl N Ty x\ abstract-params (TBody x) Args T X (T'' x) (X'' x),
+    %    copy P x => (copy (T'' x) (T' x),
+    %      copy (X'' x) (X' x))
+    %  ),
+    %  RT = prod N Ty (x\ prod _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ T' x)),
+    %  RX = fun N Ty (x\ fun _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ X' x)).
+    %abstract-params _ _ T X T X.
 
   }
 
@@ -239,21 +239,21 @@ namespace hb {
   % (prod Sort _ (x\ prod Class _ _)) when T is a structure and SortP and ClassP
   % are its projections. X is of type (prod _ T _) and XR of type TR, such that XR s c = X (Pack s c).
   % If X = ClassP _, we fail.
-  pred simpl-tc-instance i:term, i:term, o:term, o:term.
-  simpl-tc-instance (prod N T TBody) X RT RX :- 
-    simpl-tc-instance.translate-ty T [] TSort TClass,
-    @pi-decl N T x\ @pi-decl _ TSort xs\ @pi-decl _ (TClass xs) xc\ sigma CopyClauses Bx TBody' TBody''\
-      simpl-tc-instance.mk-copy-clauses T x xs xc [] CopyClauses Bx,
-      CopyClauses => copy! (TBody x) TBody',
-      simpl-tc-instance.avoid-pattern xs TBody',
-      simpl-tc-instance.check-progress (TBody x) TBody',
-      copy x Bx => copy! TBody' TBody'',
-      not (simpl-tc-instance.check-progress TBody' TBody''), !,
-      simpl-tc-instance TBody'' {coq.mk-app X [Bx]} (TRx xs xc) (Rx xs xc),
-      RT = prod _ TSort (xs\ prod _ (TClass xs) (xc\ TRx xs xc)),
-      RX = fun _ TSort (xs\ fun _ (TClass xs) (xc\ Rx xs xc)).
-  simpl-tc-instance (prod N T TBody) X (prod N T TRx) (fun N T Rx) :- !,
-    @pi-decl N T x\ simpl-tc-instance (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x).
+  %pred simpl-tc-instance i:term, i:term, o:term, o:term.
+  %simpl-tc-instance (prod N T TBody) X RT RX :- 
+  %  simpl-tc-instance.translate-ty T [] TSort TClass,
+  %  @pi-decl N T x\ @pi-decl _ TSort xs\ @pi-decl _ (TClass xs) xc\ sigma CopyClauses Bx TBody' TBody''\
+  %    simpl-tc-instance.mk-copy-clauses T x xs xc [] CopyClauses Bx,
+  %    CopyClauses => copy! (TBody x) TBody',
+  %    simpl-tc-instance.avoid-pattern xs TBody',
+  %    simpl-tc-instance.check-progress (TBody x) TBody',
+  %    copy x Bx => copy! TBody' TBody'',
+  %    not (simpl-tc-instance.check-progress TBody' TBody''), !,
+  %    simpl-tc-instance TBody'' {coq.mk-app X [Bx]} (TRx xs xc) (Rx xs xc),
+  %    RT = prod _ TSort (xs\ prod _ (TClass xs) (xc\ TRx xs xc)),
+  %    RX = fun _ TSort (xs\ fun _ (TClass xs) (xc\ Rx xs xc)).
+  %simpl-tc-instance (prod N T TBody) X (prod N T TRx) (fun N T Rx) :- !,
+  %  @pi-decl N T x\ simpl-tc-instance (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x).
   %simpl-tc-instance T ((app [Class|CArgs]) as X) T' X' :-
   %  std.rev CArgs [Subject|RevParams],
   %  std.rev RevParams Params,
@@ -262,7 +262,7 @@ namespace hb {
   %  coq.safe-dest-app Subject Key Args,
   %  coq.typecheck Key TKey ok,
   %  simpl-tc-instance.abstract-params TKey Args T0 X0 T' X'.
-  simpl-tc-instance T I T I :- !.
+  %simpl-tc-instance T I T I :- !.
 
   pred get-evars i:term, o:list term.
   get-evars X [X] :- var X, !.
@@ -285,24 +285,24 @@ namespace hb {
     std.append ET EXB E.
   get-evars _ [].
 
-  pred mem-var i:list term, o:term.
+  func mem-var list term -> term.
   mem-var [] _.
-  mem-var [X|_] Y :- X == Y.
+  mem-var [X|_] Y :- X == Y, !.
   mem-var [_|L] Y :- mem-var L Y.
 
   pred has-compiled.
 
-  pred compile.subject i:list term, i:string, i:term, i:list term, i:list term, i:list term, i:list term, i:term, i:list term, i:list term, o:prop.
+  func compile.subject list term, string, term, list term, list term, list term, list term, term, list term, list term -> prop.
   compile.subject [_|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
     pi a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
   compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
     std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
     coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, {coq.mk-app ProofHd HArgs}]} C,
-    %std.append HParams HSArgs H,
+    std.append HParams HSArgs H,
     if (HArgs = []) (Clause = (C :- 
       std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
       std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok)))
-    (Clause = (C :- sigma gs dgs gs' hargs ehargs' ehargs ehparams ehsargs eh' eh\
+    (Clause = (pi gs dgs gs' hargs ehargs' ehargs ehparams ehsargs eh' eh\ C :-
       std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
       std.forall2 HParams Params (h\ x\ coq.unify-eq h x ok),
       std.forall2 HSArgs SArgs (h\ x\ coq.unify-eq h x ok),
@@ -317,14 +317,14 @@ namespace hb {
         (coq.ltac.collect-goals (app hargs) gs dgs,
         std.forall gs (g\ coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []))))).
 
-  pred compile.params i:list term, i:string i:term, i:list term, i:list term, i:list term, i:list term, i:term, o:prop.
+  func compile.params list term, string, term, list term, list term, list term, list term, term -> prop.
   compile.params [_|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
     pi p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
   compile.params [] PredName ProofHd HArgs TArgs Params HParams S Clause :-
     coq.safe-dest-app S K SArgs,
     compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
 
-  pred compile.telescope i:term, i:term, i:list term, i:list term, o:prop.
+  func compile.telescope term, term, list term, list term -> prop.
   compile.telescope (prod _ T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
     pi x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
   compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause :- !,
@@ -334,18 +334,18 @@ namespace hb {
     std.rev RP Params,
     compile.params Params PredName ProofHd HArgs TArgs Params [] S Clause.
 
-  pred compile i:term, i:term, o:prop.
+  func compile term, term -> prop.
   compile Ty ProofHd Clause :-
     compile.telescope Ty ProofHd [] [] Clause.
 }
 
-pred tc.gref->pred-name i:gref, o:string.
+func tc.gref->pred-name gref -> string.
 namespace tc {
-  pred lettify.main i:term, o:term.
+  func lettify.main term -> term.
   namespace compile {
-    pred instance i:term, i:term, o:prop.
+    func instance term, term -> prop.
     instance Ty ProofHd Clause :-
-      hb.compile Ty ProofHd Clause.
+      hb.compile Ty ProofHd Clause, !.
   }
 }
 }}.

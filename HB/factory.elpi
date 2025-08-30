@@ -193,6 +193,7 @@ cdecl->w-mixins.mixins (context-item ID _ TySkel none Rest) Out :- !,
 % The identity builder
 func declare-id-builder factoryname -> prop.
 declare-id-builder GR (from GR GR (global (const C))) :- std.do! [
+  gref->deps GR GRD,
   synthesis.mixins-w-params.fun GRD (declare-id-builder.aux GR) IDBodySkel,
   std.assert-ok! (coq.elaborate-skeleton IDBodySkel IDType IDBody) "identity builder illtyped",
   log.coq.env.add-const-noimplicits "identity_builder" IDBody IDType @transparent! C,

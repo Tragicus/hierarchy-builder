@@ -67,9 +67,9 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
-	%(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
-  %if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
-  %     log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
+	(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
+  if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
+       log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
 
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
@@ -88,8 +88,8 @@ declare Module BSkel Sort :- std.do! [
 
   w-params.nparams MLwP NParams,
 
-%  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
-%    with-locality (log.coq.CS.declare-instance ConstPackS), 
+  if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
+    with-locality (log.coq.CS.declare-instance ConstPackS), 
   class-def CurrentClass => private.sort-cs-catch-all ClassName NParams,
 
 	coq.TC.declare-class ClassName,
@@ -126,11 +126,11 @@ declare Module BSkel Sort :- std.do! [
 
   if-verbose (coq.say {header} "making coercion from type to target"),
 	if (synthesis.infer-coercion-tgt MLwP CoeClass)
+	 (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
+    private.declare-sort-coercion CoeClass Structure SortProjection)
     (if-arg-sort (private.declare-sort-coercion-elpi Structure
       (global (const ArgSortCst))),
-    private.declare-sort-coercion-elpi Structure SortProjection)
-	 (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
-    private.declare-sort-coercion CoeClass Structure SortProjection),
+    private.declare-sort-coercion-elpi Structure SortProjection),
 
   %private.declare-generic-coercion-elpi Structure,
 
