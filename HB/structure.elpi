@@ -86,6 +86,15 @@ declare Module BSkel Sort :- std.do! [
 
   log.coq.env.begin-module "Exports" none,
 
+  if-verbose (coq.say {header} "accumulating various props"),
+  std.flatten [
+      Factories, [is-structure Structure],
+      [class-def CurrentClass], GRDepsClauses,
+      [gref->deps GRPack MLwP], MixinMems, [StructKeyClause]
+    ]
+    NewClauses,
+  acc-clauses current NewClauses,
+
   if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
     with-locality (log.coq.CS.declare-instance ConstPackS), 
 
@@ -135,6 +144,7 @@ declare Module BSkel Sort :- std.do! [
   if-verbose (coq.say {header} "exporting unification hints"),
   ClassAlias => Factories => GRDepsClauses =>
     private.declare-unification-hints SortProjection ClassProjection CurrentClass NewJoins,
+  acc-clauses current NewJoins,
   % Register in Elpi's DB the new structure
   % NOT TODO: All these acc are correctly locaed in an Export Module
 
@@ -144,15 +154,6 @@ declare Module BSkel Sort :- std.do! [
       (private.export-mixin-coercion ClassName)
     ])
     (coq.say "declare:" ClassName "should be an inductive", fail),
-
-  if-verbose (coq.say {header} "accumulating various props"),
-  std.flatten [
-      Factories, [is-structure Structure],
-      NewJoins, [class-def CurrentClass], GRDepsClauses,
-      [gref->deps GRPack MLwP], MixinMems, [StructKeyClause]
-    ]
-    NewClauses,
-  acc-clauses current NewClauses,
 
   if-verbose (coq.say {header} "stop module Exports"),
   log.coq.env.end-module-name "Exports" Exports,
@@ -433,33 +434,6 @@ mk-coe-structure-body StructureF StructureT TC Coercion SortProjection ClassProj
      lp:PackPH (lp:SortP s) (lp:CoercionP (lp:SortP s) (lp:ClassP s)) }},
 ].
 
-pred mk-rev-coe-structure-class-body
-  i:classname, % From factory
-  i:structure, % From structure
-  i:structure, % To structure
-  i:factoryname, % To factory (for nparams)
-  i:term, % structure coercion
-  i:term, % sort projection
-  i:term, % class projection
-  i:list term, i:term, % Params, T
-  i:list (w-args mixinname),
-  o:term.
-mk-rev-coe-structure-class-body FC StructureF StructureT TC SCoercion _ ClassProjection
-    Params _T _ SCoeBody :- std.do! [
-  get-structure-sort-projection StructureT SortProjection,
-  if (SortProjection = primitive _) (SortP = SortProjection)
-    (mk-app SortProjection {coq.mk-n-holes {factory-nparams TC} } SortP),
-
-  mk-app (global StructureF) Params StructureP,
-  mk-app (global FC) Params FCP,
-  if (ClassProjection = primitive _) (ClassP = ClassProjection)
-    (mk-app ClassProjection Params ClassP),
-  mk-app SCoercion Params SCoercionP,
-
-  SCoeBody = {{ fun s : lp:StructureP => lp:ClassP s : lp:FCP (lp:SortP (lp:SCoercionP s)) }},
-].
-
-
 % [declare-coercion P1 P2 C1 C2] declares a structure and a class coercion
 % from C1 to C2 given P1 P2 the two projections from the structure of C1
 pred declare-coercion i:term, i:term, i:hbclass, i:hbclass.
@@ -471,7 +445,6 @@ declare-coercion SortProjection ClassProjection
   CName is ModNameF ^ "_class__to__" ^ ModNameT ^ "_class",
   SName is ModNameF ^ "__to__" ^ ModNameT,
   SCName is ModNameF ^ "__to__" ^ ModNameT ^ "_class",
-  SRCName is ModNameT ^ "__to__" ^ ModNameF ^ "_class",
 
   if-verbose (coq.say {header} "declare coercion" SName),
 
@@ -498,22 +471,6 @@ declare-coercion SortProjection ClassProjection
   log.coq.env.add-const-noimplicits SName SCoeBody' STy @transparent! SC,
   log.coq.coercion.declare (coercion (const SC) 0 StructureF (grefclass StructureT)),
 
-  w-params.then FMLwP mk-fun ignore
-    (mk-coe-structure-class-body StructureF StructureT TC Coercion SortProjection ClassProjection)
-    SCCoeBody,
-
-  std.assert-ok! (coq.elaborate-skeleton SCCoeBody SCTy SCCoeBody') ErrorMessage,
-  log.coq.env.add-const-noimplicits SCName SCCoeBody' SCTy @transparent! SCC,
-  coq.TC.declare-instance (const SCC) 1,
-
-  w-params.then FMLwP mk-fun ignore
-    (mk-rev-coe-structure-class-body FC StructureF StructureT TC (global (const SC)) SortProjection ClassProjection)
-    SRCCoeBody,
-
-  std.assert-ok! (coq.elaborate-skeleton SRCCoeBody SRCTy SRCCoeBody') ErrorMessage,
-  log.coq.env.add-const-noimplicits SRCName SRCCoeBody' SRCTy @transparent! SRCC,
-  coq.TC.declare-instance (const SRCC) 1,
-
   StructureF = indt SIndF,
   coq.env.indt SIndF _ NParamsF _ _ _ _,
   coq.env.projections SIndF [some SortPF, _],
@@ -529,7 +486,15 @@ declare-coercion SortProjection ClassProjection
   coq.equivalent-keys.add PF NF PT NT,
 
   w-params.nparams FMLwP NparamsSC,
-  acc-clause current (sub-class FC TC SC NparamsSC)
+  acc-clause current (sub-class FC TC SC NparamsSC),
+
+  w-params.then FMLwP mk-fun ignore
+    (mk-coe-structure-class-body StructureF StructureT TC Coercion SortProjection ClassProjection)
+    SCCoeBody,
+
+  std.assert-ok! (coq.elaborate-skeleton SCCoeBody SCTy SCCoeBody') ErrorMessage,
+  log.coq.env.add-const-noimplicits SCName SCCoeBody' SCTy @transparent! SCC,
+  coq.TC.declare-instance (const SCC) 1,
 ].
 
 pred join-body i:structure, i:classname, i:classname, i:term, i:term, i:term, i:term,
@@ -540,8 +505,8 @@ join-body S3 C1 C2 S1_sort S3_to_S1 S2_class S3_to_S2
   mk-app S3_to_S1 P S3_to_S1P,
   mk-app S3_to_S2 P S3_to_S2P,
 
-  factory-nparams C1 N1,
-  factory-nparams C2 N2,
+  factory->nparams C1 N1,
+  factory->nparams C2 N2,
 
   mk-app (global C2) {coq.mk-n-holes N2} C2P,
 

@@ -184,7 +184,7 @@ decl-const-in-struct T _Class Name S STy CS:- std.do![
 	ty->class STy1 (global Hd),
 	term->cs-pattern T Pat,
 	class-def (class Hd Struct _),
-	coq.elpi.accumulate _ "hb.db" (clause _ _ (has-canonical-structure-on Pat Struct)),
+	coq.elpi.accumulate _ "tc.db" (clause _ _ (has-canonical-structure-on Pat Struct)),
   acc-clause current (local-canonical CS),
   Struct = indt SInd,
   coq.env.indt SInd _ NParams _ _ _ _,
@@ -286,8 +286,9 @@ saturate-instances Filter :- std.do! [
 
 func no-instance-for cs-pattern, hbclass ->.
 no-instance-for K (class _ S _) :-
-  get-structure-sort-projection S (global Proj),
-  coq.CS.db-for Proj K [].
+  get-structure-sort-projection S P,
+  if (P = primitive (proj PP _)) (coq.projection->gref PP PC) (P = global PC),
+  coq.CS.db-for PC K [].
 
 /* ------------------------------------------------------------------------- */
 /* ----------------------------- private code ------------------------------ */

@@ -320,26 +320,6 @@ assert-good-coverage! MLSortedRev CNL :- std.do! [
 
 %%%%% Coq Database %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% [get-structure-coercion S1 S2 F] finds the coecion F from the structure S1 to S2
-func get-structure-coercion structure, structure -> term.
-get-structure-coercion S T (global F) :-
-  coq.coercion.db-for (grefclass S) (grefclass T) L,
-  if (L = [pr F _]) true (coq.error "No one step coercion from" S "to" T).
-
-func get-structure-sort-projection structure -> term.
-get-structure-sort-projection (indt S) Proj :- !,
-  coq.env.projections S L,
-  if (L = [some P, _]) true (coq.error "No canonical sort projection for" S),
-  Proj = global (const P).
-get-structure-sort-projection S _ :- coq.error "get-structure-sort-projection: not a structure" S.
-
-func get-structure-class-projection structure -> term.
-get-structure-class-projection (indt S) T :- !,
-  coq.env.projections S L,
-  if (L = [_, some P]) true (coq.error "No canonical class projection for" S),
-  T = global (const P).
-get-structure-class-projection S _ :- coq.error "get-structure-class-projection: not a structure" S.
-
 func get-constructor gref -> gref.
 get-constructor (indt R) (indc K) :- !,
  if (coq.env.indt R _ _ _ _ [K] _) true (coq.error "Not a record" R).

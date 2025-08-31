@@ -24,7 +24,7 @@ with-locality P :-
   A => P.
 
 func acc-clause scope, prop.
-acc-clause Scope C :- coq.elpi.accumulate Scope "hb.db" (clause _ _ C).
+acc-clause Scope C :- coq.elpi.accumulate Scope "tc.db" (clause _ _ C).
 
 pred do-verbose! i:list prop.
 do-verbose! L :- get-option "verbose" tt, std.spy-do! L.
@@ -81,7 +81,7 @@ simpl-proj T T.
 /* Uncomment and remove HB/common/compat_acc_clauses_*.elpi once requiring coq-elpi >= 1.18.0,
    which implies Coq >= 8.17
 pred acc-clauses i:scope, i:list prop.
-acc-clauses Scope CL :- coq.elpi.accumulate-clauses Scope "hb.db" {std.map CL (c\r\ r = clause _ _ c)}.
+acc-clauses Scope CL :- coq.elpi.accumulate-clauses Scope "tc.db" {std.map CL (c\r\ r = clause _ _ c)}.
 */
 
 % TODO: Should this only be used for gref that are factories? (and check in the first/second branch so?)

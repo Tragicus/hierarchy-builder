@@ -40,13 +40,13 @@ func coq.env.current-library -> string.
 coq.env.current-library L :- loc.fields {get-option "elpi.loc"} L _ _ _ _, !.
 coq.env.current-library "dummy.v".
 
-% this is only declared in hb.db, this declaration is only to avoid a warning
+% this is only declared in tc.db, this declaration is only to avoid a warning
 pred docstring o:loc, o:string.
 
 func save-docstring.
 save-docstring :-
   if (get-option "elpi.loc" Loc, get-option "elpi.phase" "interp", get-option "doc" Txt)
-     (coq.elpi.accumulate _ "hb.db" (clause _ _ (docstring Loc Txt)))
+     (coq.elpi.accumulate _ "tc.db" (clause _ _ (docstring Loc Txt)))
      true.
 
 func compute-filter option string -> list string.

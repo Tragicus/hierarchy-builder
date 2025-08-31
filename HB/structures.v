@@ -23,6 +23,8 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 (* ********************* structures ****************************** *)
 From elpi Require Import elpi coercion tc.
 
+From elpi.apps.tc.elpi Extra Dependency "tc_aux.elpi" as tc_aux.
+
 TC.AddAllClasses.
 TC.AddAllInstances.
 
@@ -73,6 +75,37 @@ Global Open Scope HB_scope.
 
 (* Hacking the tc solver's instance compilation clause. *)
 Elpi Accumulate tc.db lp:{{
+func w-holes.aux int, (list term -> prop -> prop), list term -> prop.
+w-holes.aux 0 P L R :- !, P L R, !.
+w-holes.aux N P L (pi x\ R x) :- pi x\ w-holes.aux {calc (N - 1)} P [x|L] (R x).
+
+func w-holes int, (list term -> prop -> prop) -> prop.
+w-holes N P R :- w-holes.aux N P [] R.
+
+% [get-structure-coercion S1 S2 F] finds the coecion F from the structure S1 to S2
+func get-structure-coercion structure, structure -> term.
+get-structure-coercion S T (global F) :-
+  coq.coercion.db-for (grefclass S) (grefclass T) L,
+  if (L = [pr F _]) true (coq.error "No one step coercion from" S "to" T).
+
+func get-structure-sort-projection structure -> term.
+get-structure-sort-projection (indt S) Proj :- !,
+  coq.env.projections S L,
+  if (L = [some PC, _]) true (coq.error "No canonical sort projection for" S),
+  if (coq.env.primitive-projection? PP PC PN)
+    (Proj = primitive (proj PP PN))
+    (Proj = global (const PC)).
+get-structure-sort-projection S _ :- coq.error "get-structure-sort-projection: not a structure" S.
+
+func get-structure-class-projection structure -> term.
+get-structure-class-projection (indt S) T :- !,
+  coq.env.projections S L,
+  if (L = [_, some PC]) true (coq.error "No canonical class projection for" S),
+  if (coq.env.primitive-projection? PP PC PN)
+    (T = primitive (proj PP PN))
+    (T = global (const PC)).
+get-structure-class-projection S _ :- coq.error "get-structure-class-projection: not a structure" S.
+
 namespace hb {
   namespace simpl-tc-instance {
     pred mergesort.split i:list int, o:list int, o:list int.
@@ -359,48 +392,96 @@ namespace hb {
           %,gs = []
         ))).
 
-  func compile.params list term, string, term, list term, list term, list term, list term, term -> prop.
-  compile.params [P|Params] PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) :-
+  func compile.try-rev-coercion gref, list term, term -> prop.
+  compile.try-rev-coercion Class ParamsF K Clause :-
+    if (K = primitive (proj P _)) (coq.projection->gref P (const PC)) (K = global (const PC)),
+    coq.env.projection-record? PC TStruct',
+    TStruct = indt TStruct',
+    class-def (class Class Struct _), !,
+    Class = indt ClassIndt,
+    coq.env.indt ClassIndt _ NParamsF _ _ _ _,
+    std.length ParamsF { calc (NParamsF - 1) },
+    if (Struct = TStruct) (%TODO: compile.unfolding-clause PredName
+                           fail) (
+      class-def (class TC TStruct _), !,
+      tc.gref->pred-name TC PredName,
+
+      get-structure-sort-projection Struct SortProjectionF,
+      TC = indt TCIndt,
+      coq.env.indt TCIndt _ NParamsT _ _ _ _,
+      w-holes { calc (NParamsT - 1) } (paramsT\ clause\
+        if (SortProjectionF = primitive _) (SortPF = SortProjectionF)
+          (coq.mk-app SortProjectionF ParamsF SortPF),
+
+        sub-class TC Class SCoercion _,
+        coq.mk-app (global (const SCoercion)) ParamsF SCoercionP,
+
+        get-structure-class-projection TStruct ClassProjection,
+        if (ClassProjection = primitive _) (ClassP = ClassProjection)
+          (coq.mk-app ClassProjection ParamsF ClassP),
+
+        sigma clause'\
+          clause = (pi y x r\ clause' y x r),
+          pi y x r\ sigma c\
+            coq.elpi.predicate PredName {std.append paramsT [{coq.mk-app SortPF [x]}, r]} c,
+            clause' y x r = (pi xt paramst l\ c :-
+              var x, !,
+              coq.mk-app SCoercionP [y] x,
+              coq.typecheck x xt ok,
+              coq.safe-dest-app xt l paramst,
+              std.forall2 paramst paramsT (x\ y\ coq.unify-eq x y ok),
+              coq.mk-app ClassP [y] r)) Clause).
+
+  func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> list prop.
+  compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S Clauses :-
     coq.typecheck P T ok,
-    @pi-decl _ T p\ compile.params Params PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p).
-  compile.params [] PredName ProofHd HArgs TArgs Params HParams S Clause :-
+    @pi-decl _ T p\ (compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clauses' p),
+      std.length (Clauses' p) NC),
+    std.list.init NC (i\ r : prop\ sigma f\
+      (pi x\ std.nth i (Clauses' x) (f x)),
+      r = (pi x\ f x)) Clauses.
+
+  compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clauses :-
     coq.safe-dest-app S K SArgs,
+    if (compile.try-rev-coercion Class Params K ClauseRev) (Clauses = [Clause, ClauseRev]) (Clauses = [Clause]),
     compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
 
-  func compile.telescope term, term, list term, list term -> prop.
-  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) :-
-    @pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x).
-  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause :- !,
+  func compile.telescope term, term, list term, list term -> list prop.
+  compile.telescope (prod N T B) ProofHd HArgs TArgs Clauses :-
+    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clauses' x),
+      std.length (Clauses' x) NC),
+    std.list.init NC (i\ r : prop\ sigma f\
+      (pi x\ std.nth i (Clauses' x) (f x)),
+      r = (pi x\ f x)) Clauses.
+
+  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clauses :- !,
     coq.TC.class? Class,
     tc.gref->pred-name Class PredName,
     std.rev PS [S|RP],
     std.rev RP Params,
-    compile.params Params PredName ProofHd HArgs TArgs Params [] S Clause.
+    compile.params Params Class PredName ProofHd HArgs TArgs Params [] S Clauses.
 
-  func compile term, term -> prop.
-  compile Ty ProofHd Clause :-
-    compile.telescope Ty ProofHd [] [] Clause.
+  func compile term, term -> list prop.
+  compile Ty ProofHd Clauses :-
+    compile.telescope Ty ProofHd [] [] Clauses.
 }
 
 func tc.gref->pred-name gref -> string.
 namespace tc {
   func lettify.main term -> term.
   namespace compile {
-    func instance term, term -> prop.
-    instance Ty ProofHd Clause :-
-      hb.compile Ty ProofHd Clause, !.
+    func instance term, term -> list prop.
+    instance Ty ProofHd Clauses :-
+      hb.compile Ty ProofHd Clauses, !.
   }
 }
-}}.
 
-(* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
-(* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
-(* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% *)
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-(** This data represents the hierarchy and some other piece of state to
-    implement the commands of this file *)
-
-#[interp] Elpi Db hb.db lp:{{
+% This data represents the hierarchy and some other piece of state to
+%    implement the commands of this file
 
 typeabbrev mixinname   gref.
 typeabbrev classname   gref.
@@ -620,7 +701,7 @@ pred docstring o:loc, o:string.
 *)
 
 #[arguments(raw)] Elpi Command HB.locate.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 (* Since it can become rather large, accumulating the DB is often by far the
    most expensive accumulation. It is then worth sharing its cache between
    the commands. To this end, we accumulate the DB first in each command to
@@ -654,7 +735,7 @@ Elpi Export HB.locate.
 *)
 
 #[arguments(raw)] Elpi Command HB.about.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/utils.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
@@ -688,7 +769,7 @@ Elpi Export HB.about.
 *)
 
 #[arguments(raw)] Elpi Command HB.howto.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -730,7 +811,7 @@ Elpi Export HB.howto.
 *)
 
 #[arguments(raw)] Elpi Command HB.status.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -760,7 +841,7 @@ tred file.dot | xdot -
 *)
 
 #[arguments(raw)] Elpi Command HB.graph.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -810,7 +891,6 @@ HB.mixin Record MixinName T & Factory1 T & … & FactoryN T := {
 
 #[arguments(raw)] Elpi Command HB.mixin.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -893,7 +973,6 @@ Elpi Export HB.mixin.
 
 Elpi Tactic HB.pack_for.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -917,7 +996,6 @@ Elpi Export HB.pack_for.
 
 Elpi Tactic HB.pack.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -995,7 +1073,7 @@ HB.structure Definition StructureName params :=
 #[arguments(raw)] Elpi Command HB.structure.
 Elpi Accumulate Db coercion.db.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1079,7 +1157,6 @@ Elpi Export HB.structure.
 
 #[arguments(raw)] Elpi Command HB.saturate.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1130,7 +1207,6 @@ HB.instance Definition N Params := Factory.Build Params T …
 
 #[arguments(raw)] Elpi Command HB.instance.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1175,7 +1251,6 @@ Elpi Export HB.instance.
 
 #[arguments(raw)] Elpi Command HB.factory.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1259,7 +1334,6 @@ HB.end.
 
 #[arguments(raw)] Elpi Command HB.builders.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1301,7 +1375,6 @@ Elpi Export HB.builders.
 
 #[arguments(raw)] Elpi Command HB.end.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1375,7 +1448,7 @@ Export Algebra.Exports.
 *)
 
 #[arguments(raw)] Elpi Command HB.export.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1421,7 +1494,7 @@ Elpi Export HB.export.
    (a module which is not closed yet) *)
 
 #[arguments(raw)] Elpi Command HB.reexport.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1505,7 +1578,6 @@ HB.instance Definition _ : Ml ... T := ml.
 
 #[arguments(raw)] Elpi Command HB.declare.
 Elpi Accumulate Db tc.db.
-Elpi Accumulate Db hb.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1541,7 +1613,7 @@ Elpi Export HB.declare.
     [#[fail]] attribute. *)
 
 #[arguments(raw)] Elpi Command HB.check.
-Elpi Accumulate Db hb.db.
+Elpi Accumulate Db tc.db.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
