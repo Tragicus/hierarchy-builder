@@ -159,7 +159,8 @@ func phant-fun-struct term, name, structure, list term, (term -> phant-term) -> 
 phant-fun-struct T Name S Params PF Out :- std.do! [
   get-structure-sort-projection S SortProj,
   mk-app (global S) Params SParams,
-  mk-app SortProj Params SortProjParams,
+  if (SortProj = primitive _) (SortProjParams = SortProj)
+    (mk-app SortProj Params SortProjParams),
   % Msg = {{lib:hb.nomsg}},
   Msg = some {{lp:SParams}},
   (@pi-decl Name SParams s\ fun-unify Msg T {mk-app SortProjParams [s]} (PF s) (UnifSI s)),
