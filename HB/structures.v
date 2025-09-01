@@ -370,7 +370,7 @@ namespace hb {
     if (HArgs = []) (Clause = (C :- 
       std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
       std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok)))
-    (Clause = (C :- sigma ehargs eh\
+    (Clause = (pi ehargs eh\ C :-
       std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
       (sigma g gs\
         coq.ltac.collect-goals (app [KHSArgs|HParams]) g gs,
@@ -409,12 +409,12 @@ namespace hb {
       get-structure-sort-projection Struct SortProjectionF,
       TC = indt TCIndt,
       coq.env.indt TCIndt _ NParamsT _ _ _ _,
-      w-holes { calc (NParamsT - 1) } (paramsT\ clause\
+      w-holes { calc (NParamsT - 1) } (paramsT\ clause\ sigma scoercionP\
         if (SortProjectionF = primitive _) (SortPF = SortProjectionF)
           (coq.mk-app SortProjectionF ParamsF SortPF),
 
         sub-class TC Class SCoercion _,
-        coq.mk-app (global (const SCoercion)) ParamsF SCoercionP,
+        coq.mk-app (global (const SCoercion)) paramsT scoercionP,
 
         get-structure-class-projection TStruct ClassProjection,
         if (ClassProjection = primitive _) (ClassP = ClassProjection)
@@ -426,21 +426,19 @@ namespace hb {
             coq.elpi.predicate PredName {std.append paramsT [{coq.mk-app SortPF [x]}, r]} c,
             clause' y x r = (pi xt paramst l\ c :-
               var x, !,
-              coq.mk-app SCoercionP [y] x,
+              coq.mk-app scoercionP [y] x,
               coq.typecheck x xt ok,
               coq.safe-dest-app xt l paramst,
-              std.forall2 paramst paramsT (x\ y\ coq.unify-eq x y ok),
+              std.forall2 paramst ParamsF (x\ y\ coq.unify-eq x y ok),
               coq.mk-app ClassP [y] r)) Clause).
 
   func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> list prop.
   compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S Clauses :-
     coq.typecheck P T ok,
     @pi-decl _ T p\ (compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clauses' p),
-      std.length (Clauses' p) NC),
-    std.list.init NC (i\ r : prop\ sigma f\
-      (pi x\ std.nth i (Clauses' x) (f x)),
-      r = (pi x\ f x)) Clauses.
-
+      std.map (Clauses' x) (i\ r\ r x = i) Clauses''),
+    std.map Clauses'' (i\ r : prop\ r = pi x\ i x) Clauses.
+    
   compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clauses :-
     coq.safe-dest-app S K SArgs,
     if (compile.try-rev-coercion Class Params K ClauseRev) (Clauses = [Clause, ClauseRev]) (Clauses = [Clause]),
@@ -449,10 +447,8 @@ namespace hb {
   func compile.telescope term, term, list term, list term -> list prop.
   compile.telescope (prod N T B) ProofHd HArgs TArgs Clauses :-
     (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clauses' x),
-      std.length (Clauses' x) NC),
-    std.list.init NC (i\ r : prop\ sigma f\
-      (pi x\ std.nth i (Clauses' x) (f x)),
-      r = (pi x\ f x)) Clauses.
+      std.map (Clauses' x) (i\ r\ r x = i) Clauses''),
+    std.map Clauses'' (i\ r : prop\ r = pi x\ i x) Clauses.
 
   compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clauses :- !,
     coq.TC.class? Class,
