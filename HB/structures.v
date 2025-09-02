@@ -38,7 +38,7 @@ tc-HB.structures.tc-unify T T X1 X2 _ R :-
   R = {{ @id_phant lp:T lp:X1 (@Phant lp:T lp:X1) }}.
 }}.
 
-Ltac done_tc := assumption || elpi TC.Solver.
+Ltac done_tc := elpi TC.Solver.
 
 Register unify as hb.unify.
 Register id_phant as hb.id.
@@ -339,7 +339,7 @@ namespace hb {
   mem-var [X|_] Y :- X == Y, !.
   mem-var [_|L] Y :- mem-var L Y.
 
-  pred mem-sealed-goal i:list sealed-goal, o:sealed-goal.
+  pred mem-sealed-goal i:list sealed-goal, i:sealed-goal.
   mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y.
   mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
 
@@ -356,44 +356,89 @@ namespace hb {
 
   pred has-compiled.
 
+  func compile.mk-clause list term, string, term, list term, list term, list term, list term, term, list term, list (term -> term), list term, list term -> prop.
+  compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams K KT KBody SArgs RHSArgs Clause :-
+    std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
+    coq.mk-app ProofHd HArgs Proof,
+    coq.typecheck Proof _ ok, %This instantiates the parameters, if applicable
+    std.append Params SArgs ParamsSArgs,
+    std.append HParams HSArgs HParamsSArgs,
+    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, Proof]} C,
+    %std.append HParams HSArgs H,
+    if (HArgs = []) (Conds0 = []) (Conds0 = [std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok)]),
+    (pi ginit gfinal\
+      if (HParamsSArgs = []) (Conds1 ginit = [ginit = []|Conds0]) (
+        Conds1 ginit = [
+          sigma g gs\
+            coq.ltac.collect-goals (app HParamsSArgs) g gs,
+            std.append g gs ginit|Conds0]),
+      if (K = (prod N T Body))
+        (KT = [KT'],
+        KBody = [KBody'],
+        Conds2 ginit = [(
+          coq.unify-eq T KT' ok,
+          @pi-decl N T a\ coq.unify-eq (Body a) (KBody' a) ok)|Conds1 ginit])
+        (Conds2 ginit = Conds1 ginit),
+      if (HParamsSArgs = []) (Conds3 ginit = Conds2 ginit) (
+        Conds3 ginit = [std.forall2 ParamsSArgs HParamsSArgs (h\ x\ coq.unify-eq h x ok)|Conds2 ginit]),
+      if (HParamsSArgs = []) (Conds4 ginit gfinal = Conds3 ginit) (
+        std.append HParamsSArgs [K|ParamsSArgs] H0,
+        std.append HArgs H0 H1,
+        Conds4 ginit gfinal = [
+          (sigma g gs\
+            coq.ltac.collect-goals (app H1) g gs,
+            std.append g gs gfinal,
+          std.forall gfinal (g\
+            mem-sealed-goal ginit g;
+            sigma gs\
+              coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g gs
+              %Not checking is dangerous...
+              %,gs = []
+            ))|Conds3 ginit]),
+      std.rev (Conds4 ginit gfinal : list prop) (Conds5 ginit gfinal)),
+    Clause = (pi ginit gfinal\ C :- Conds5 ginit gfinal).
+
   func compile.subject list term, string, term, list term, list term, list term, list term, term, list term, list term -> prop.
   compile.subject [A|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
     coq.typecheck A T ok,
     @pi-decl _ T a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
+  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (let _ _ T Body) SArgs RHSArgs Clause :- !,
+    compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (Body T) SArgs RHSArgs Clause.
+  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (prod N T Body) SArgs RHSArgs (pi t a\ Clause t a) :- !,
+    coq.typecheck T TTy ok,
+    @pi-decl _ TTy t\ pi a\
+      compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams (prod N t a) [T] [Body] SArgs RHSArgs (Clause t a).
+  %TODO: fun
   compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
-    std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
-    coq.mk-app K HSArgs KHSArgs,
-    coq.mk-app ProofHd HArgs Proof,
-    (sigma t\ coq.typecheck Proof t ok), %This instantiates the parameters, if applicable
-    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, Proof]} C,
-    %std.append HParams HSArgs H,
-    if (HArgs = []) (Clause = (C :- 
-      std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
-      std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok)))
-    (Clause = (pi ehargs eh\ C :-
-      std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok),
-      (sigma g gs\
-        coq.ltac.collect-goals (app [KHSArgs|HParams]) g gs,
-        std.append g gs eh),
-      std.forall2 Params HParams (h\ x\ coq.unify-eq h x ok),
-      std.forall2 SArgs HSArgs (h\ x\ coq.unify-eq h x ok),
-      if (HArgs = [], Params = [], SArgs = [], HParams = [], HSArgs = []) (ehargs = [])
-      (sigma l l0 l1 g gs\
-        std.append HParams [KHSArgs|SArgs] l,
-        std.append Params l l0,
-        std.append HArgs l0 l1,
-        coq.ltac.collect-goals (app l1) g gs,
-        std.append g gs ehargs),
-      std.forall ehargs (g\
-        mem-sealed-goal eh g;
-        sigma gs\
-          coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g gs
-          %Not checking is dangerous...
-          %,gs = []
-        ))).
+    compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams K [] [] SArgs RHSArgs Clause.
 
-  func compile.try-rev-coercion gref, list term, term -> prop.
-  compile.try-rev-coercion Class ParamsF K Clause :-
+  func reduce term -> term.
+  reduce T R :-
+		coq.reduction.whd-betaiota-deltazeta-for-iota-state T U,
+    if (T = U)
+      (coq.safe-dest-app U Hd Args,
+        not (var Hd),
+        if (Hd = global (const HdG)) (coq.env.const-body HdG (some Hd'))
+          (Hd = primitive (proj P N),
+          coq.primitive.projection-unfolded P PU,
+          Hd' = primitive (proj PU N)),
+        coq.mk-app Hd' Args V,
+        coq.reduction.whd-betaiota-deltazeta-for-iota-state V R,
+        not (R = T))
+      (R = U).
+
+  func compile.unfolding-clause gref, list term -> prop.
+  compile.unfolding-clause Class Params (pi x y x'\ Clause x y x') :-
+    tc.gref->pred-name Class PredName,
+		pi x y x'\ sigma args args' c c'\
+			std.append Params [x, y] args,
+			coq.elpi.predicate PredName args c,
+			std.append Params [x', y] args',
+			coq.elpi.predicate PredName args' c',
+			Clause x y x' = (c :- !, reduce x x', c').
+
+  func compile.try-rev-coercion gref, list term, term -> int, prop.
+  compile.try-rev-coercion Class ParamsF K Prio Clause :-
     if (K = primitive (proj P _)) (coq.projection->gref P (const PC)) (K = global (const PC)),
     coq.env.projection-record? PC TStruct',
     TStruct = indt TStruct',
@@ -401,8 +446,7 @@ namespace hb {
     Class = indt ClassIndt,
     coq.env.indt ClassIndt _ NParamsF _ _ _ _,
     std.length ParamsF { calc (NParamsF - 1) },
-    if (Struct = TStruct) (%TODO: compile.unfolding-clause PredName
-                           fail) (
+    if (Struct = TStruct) (compile.unfolding-clause Class ParamsF Clause, Prio = 100) (
       class-def (class TC TStruct _), !,
       tc.gref->pred-name TC PredName,
 
@@ -425,51 +469,74 @@ namespace hb {
           pi y x r\ sigma c\
             coq.elpi.predicate PredName {std.append paramsT [{coq.mk-app SortPF [x]}, r]} c,
             clause' y x r = (pi xt paramst l\ c :-
-              var x, !,
               coq.mk-app scoercionP [y] x,
               coq.typecheck x xt ok,
               coq.safe-dest-app xt l paramst,
               std.forall2 paramst ParamsF (x\ y\ coq.unify-eq x y ok),
-              coq.mk-app ClassP [y] r)) Clause).
+              coq.mk-app ClassP [y] r)) Clause,
+        Prio = 0).
 
-  func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> list prop.
-  compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S Clauses :-
+  func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> prop, int, prop.
+  compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) RevPrio RevClause :-
     coq.typecheck P T ok,
-    @pi-decl _ T p\ (compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clauses' p),
-      std.map (Clauses' x) (i\ r\ r x = i) Clauses''),
-    std.map Clauses'' (i\ r : prop\ r = pi x\ i x) Clauses.
+    (@pi-decl _ T p\ compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p) RevPrio (RevClause' p)),
+    if (pi p\ var (RevClause' p)) true (RevClause = pi p\ RevClause' p).
     
-  compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clauses :-
+  compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clause RevPrio RevClause :-
     coq.safe-dest-app S K SArgs,
-    if (compile.try-rev-coercion Class Params K ClauseRev) (Clauses = [Clause, ClauseRev]) (Clauses = [Clause]),
+    if (compile.try-rev-coercion Class Params K RevPrio RevClause) true true,
     compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
 
-  func compile.telescope term, term, list term, list term -> list prop.
-  compile.telescope (prod N T B) ProofHd HArgs TArgs Clauses :-
-    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clauses' x),
-      std.map (Clauses' x) (i\ r\ r x = i) Clauses''),
-    std.map Clauses'' (i\ r : prop\ r = pi x\ i x) Clauses.
+  func compile.telescope term, term, list term, list term -> prop, int, prop.
+  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) RevPrio RevClause :-
+    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x) RevPrio (RevClause' x)),
+    if (pi x\ var (RevClause' x)) true (RevClause = pi x\ RevClause' x).
 
-  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clauses :- !,
+  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause RevPrio RevClause :- !,
     coq.TC.class? Class,
     tc.gref->pred-name Class PredName,
     std.rev PS [S|RP],
     std.rev RP Params,
-    compile.params Params Class PredName ProofHd HArgs TArgs Params [] S Clauses.
+    compile.params Params Class PredName ProofHd HArgs TArgs Params [] S Clause RevPrio RevClause.
 
-  func compile term, term -> list prop.
-  compile Ty ProofHd Clauses :-
-    compile.telescope Ty ProofHd [] [] Clauses.
+  func compile term, term -> prop, int, prop.
+  compile Ty ProofHd Clause RevPrio RevClause :-
+    compile.telescope Ty ProofHd [] [] Clause RevPrio RevClause.
+
+  func compile.instance-gr gref -> prop, int, prop.
+  % If the instance is polymorphic, we wrap its gref into the pglobal constructor
+  compile.instance-gr InstGR (pi x\ Clause x) RevPrio (pi x\ RevClause x) :- coq.env.univpoly? InstGR _, !,
+    coq.env.typeof InstGR Ty,
+    (pi x\ compile Ty (pglobal InstGR x) (Clause x) RevPrio (RevClause x)).
+  compile.instance-gr InstGR Clause RevPrio RevClause :-
+    coq.env.typeof InstGR Ty,
+    compile Ty (global InstGR) Clause RevPrio RevClause.
 }
 
 func tc.gref->pred-name gref -> string.
 namespace tc {
   func lettify.main term -> term.
+  func add-tc-db id, grafting, prop ->.
+  func get-full-path gref -> string.
   namespace compile {
-    func instance term, term -> list prop.
-    instance Ty ProofHd Clauses :-
-      hb.compile Ty ProofHd Clauses, !.
+    func instance term, term -> prop.
+    instance Ty ProofHd Clause :-
+      hb.compile Ty ProofHd Clause _ _, !.
   }
+
+  func add-inst.aux gref, gref, list prop, grafting ->.
+  add-inst.aux Inst TC Locality Grafting :-
+    coq.env.current-section-path SectionPath,
+    hb.compile.instance-gr Inst Clause RevPrio RevClause, 
+    tc.get-full-path Inst _ClauseName, !,
+    (Locality => (
+      if (var RevClause) true (tc.add-tc-db _ (after {calc (int_to_string RevPrio)}) RevClause),
+      tc.add-tc-db _ Grafting Clause, 
+      tc.add-tc-db _ Grafting (tc.instance SectionPath Inst TC Locality))).
+  add-inst.aux Inst _ _ _ :- !,!,
+    (@global! => tc.add-tc-db _ _ (tc.banned Inst)),
+    coq.error "Not-added" "TC_solver" "[TC] Not yet able to compile" Inst "...".
+
 }
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
