@@ -312,58 +312,11 @@ term->cs-pattern T _ :- coq.error T "HB database: is not a valid canonical key".
 
 namespace abstract-holes {
 
-% we add a new constructor to terms to represent terms to be abstracted
-type abs int -> term.
-
-% bind back abstracted subterms
-func bind int, int, term, list term -> term.
-bind I M T [Ty|Tys] T1 :- M > I, !,
-  T1 = {{ fun x : lp:Ty => lp:(B x) }},   
-  N is I + 1,
-  pi x\                           % we allocate the fresh symbol for (abs M)
-    (copy (abs N) x :- !) =>      % we schedule the replacement (abs M) -> x
-    bind N M T Tys (B x).
-bind M M T _ T1 :- copy T T1.         % we perform all the replacements
-
 % for a term with M holes, returns a term with M variables to fill these holes
 % the clause see is only generated for a term if it hasn't been seen before
 % the term might need to be typechecked first or main generates extra holes for the
 % type of the parameters
 func main term -> term.
-main T1 T3 :- std.do! [
-  % we put (abs N) in place of each occurrence of the same hole
-  (pi T Tys Tys' Tys'' Ty N N' M \ fold-map T (pr N Tys) (abs M) (pr M Tys') :- var T, not (seen? T _), !, coq.typecheck T Ty ok, fold-map Ty (pr N Tys) _ (pr N' Tys''), M is N' + 1, seen! T M, Tys' = [Ty|Tys'']) =>
-  (pi T N M \ fold-map T N (abs M) N :- var T, seen? T M, !) =>
-    fold-map T1 (pr 0 []) T2 (pr M Tys),
-  % we abstract M holes (M abs nodes)
-  bind 0 M T2 {std.rev Tys} T3,
-  % cleanup constraint store
-  purge-seen!,
-].
+main T1 T3 :- coq.abs_evars T1 T3.
 
-% all constraints are also on _ so that they share
-% a variable with the constraint to purge the store
-
-% we query if the hole was seen before, and if so
-% we fetch its number
-func seen? term -> int.
-seen? X Y :- declare_constraint (seen? X Y) [X,_].  
-
-% we declare it is now seen and label it with a number
-func seen! term, int ->.
-seen! X Y :- declare_constraint (seen! X Y) [X,_].
-
-% to empty the store
-func purge-seen!.
-purge-seen! :- declare_constraint purge-seen! [_].
-
-constraint seen? seen! purge-seen!  {
-  % a succesful query, give the label back via M
-  rule (seen! X N) \ (seen? X M) <=> (M = N).
-  % an unsuccesful query
-  rule             \ (seen? X _) <=> false.
-
-  rule purge-seen! \ (seen! _ _).
-  rule \ purge-seen!.
-}
 }
