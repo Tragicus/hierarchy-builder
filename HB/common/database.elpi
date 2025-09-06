@@ -177,7 +177,7 @@ toposort-proj Proj ES In Out :- !, toposort-proj.acc Proj ES [] In Out.
 func topo-find B -> A.
 func toposort-proj.acc (pred i:A, o:gref), list (pair gref gref), list gref, list A -> list A.
 toposort-proj.acc _ ES Acc [] Out :- !,
-  std.map {std.gref.toposort ES Acc} topo-find Out, !.
+  std.map {std.gref.toposort' ES Acc} topo-find Out, !.
 toposort-proj.acc Proj ES Acc [A|In] Out :- std.do![
   Proj A B,
   topo-find B A => toposort-proj.acc Proj ES [B|Acc] In Out
@@ -185,12 +185,12 @@ toposort-proj.acc Proj ES Acc [A|In] Out :- std.do![
 
 % Classes can be topologically sorted according to the subclass relation
 func toposort-classes.mk-class-edge prop -> pair classname classname.
-toposort-classes.mk-class-edge (sub-class C1 C2 _ _) (pr C2 C1).
+toposort-classes.mk-class-edge (sub-class-edge C1 C2) (pr C2 C1).
 func toposort-classes list classname -> list classname.
 toposort-classes In Out :- std.do! [
-  std.findall (sub-class C1_ C2_ _ _) SubClasses,
-  std.map SubClasses toposort-classes.mk-class-edge ES,
-  std.gref.toposort ES In Out,
+  std.findall (sub-class-edge C1_ C2_) SubClasses,
+  std.map SubClasses (x\ r\ sigma c1 c2\ x = sub-class-edge c1 c2, r = pr c2 c1) ES,
+  std.gref.toposort' ES In Out,
 ].
 
 func findall-classes -> list hbclass.
@@ -342,19 +342,15 @@ has-cs-instance GTy (cs-instance _ (cs-gref GTy) _).
 
 func mixin-src->has-mixin-instance prop -> prop.
 mixin-src->has-mixin-instance  (mixin-src (global GR) M I) (has-mixin-instance (cs-gref GR) M IHd) :-
-	%not (has-mixin-instance (cs-gref GR) M _),
   term->gref I IHd.
 
 mixin-src->has-mixin-instance (mixin-src (app [global GR|_] ) M I) (has-mixin-instance (cs-gref GR) M IHd) :-
-	%not (has-mixin-instance (cs-gref GR) M _),
   term->gref I IHd.
 
 mixin-src->has-mixin-instance (mixin-src (prod _ _ _ ) M I) (has-mixin-instance cs-prod M IHd):-
-	%not (has-mixin-instance cs-prod M _),
   term->gref I IHd.
 
 mixin-src->has-mixin-instance (mixin-src (sort U) M I) (has-mixin-instance (cs-sort U) M IHd):-
-	%not (has-mixin-instance (cs-sort U) M _),
   term->gref I IHd.
 
 % this auxiliary function iterates over the list of arguments of an application,

@@ -107,242 +107,6 @@ get-structure-class-projection (indt S) T :- !,
 get-structure-class-projection S _ :- coq.error "get-structure-class-projection: not a structure" S.
 
 namespace hb {
-  namespace simpl-tc-instance {
-    pred mergesort.split i:list int, o:list int, o:list int.
-    mergesort.split [] [] [].
-    mergesort.split [X] [X] [].
-    mergesort.split [X, Y | L] [X|L1] [Y|L2] :-
-      mergesort.split L L1 L2.
-
-    pred mergesort.merge i:list int, i:list int, o:list int.
-    mergesort.merge [] L L.
-    mergesort.merge L [] L.
-    mergesort.merge [X|L1] [Y|L2] L :-
-      if (X < Y) (mergesort.merge L1 [Y|L2] L', L = [X|L'])
-        (mergesort.merge [X|L1] L2 L', L = [Y|L']).
-
-    pred mergesort i:list int, o:list int.
-    mergesort [] [].
-    mergesort [X] [X].
-    mergesort L L' :-
-      mergesort.split L L1 L2,
-      mergesort L1 L'1,
-      mergesort L2 L'2,
-      mergesort.merge L'1 L'2 L'.
-
-    pred undup i:list int, o:list int.
-    undup [] [].
-    undup [X, X|L] L' :- undup [X|L] L'.
-    undup [X|L] [X|L'] :- undup L L'.
-
-    pred sorted-diff i:list int, i:list int, o:list int.
-    sorted-diff [] _ [].
-    sorted-diff L [] L.
-    sorted-diff [X|L] [Y|L'] [X|R] :-
-      X < Y,
-      sorted-diff L [Y|L'] R.
-    sorted-diff [X|L] [Y|L'] R :-
-      Y < X,
-      sorted-diff [X|L] L' R.
-    sorted-diff [X|L] [X|L'] R :-
-      sorted-diff L L' R.
-
-    %pred get-args-to-compile.index i:term, o:int.
-    %get-args-to-compile.index (app [Hd|_]) N :- get-args-to-compile.index Hd N.
-%
-%    pred get-args-to-compile.aux i:term, o:list int.
-%    get-args-to-compile.aux (app Args) [I] :-
-%      std.last Args Pat,
-%      coq.safe-dest-app Pat Hd _,
-%      get-args-to-compile.index Hd I.
-%    get-args-to-compile.aux (fun _ T Body) L :-
-%      get-args-to-compile.aux T LT,
-%      (pi x\ get-args-to-compile.aux (Body x) LB),
-%      std.append LT LB L.
-%    get-args-to-compile.aux _ [].
-%
-%    pred get-args-to-compile.gather i:term, i:int, o:list int.
-%    get-args-to-compile.gather (prod _ _ T) N L :-
-%      pi x\ get-args-to-compile.index x N => get-args-to-compile.gather (T x) {calc (N + 1)} L.
-%    get-args-to-compile.gather (app [_|Args]) _ L :-
-%      std.rev Args [Pat|Params], !,
-%      if (Pat = app [_|Args']) (std.append Args' Params T) (T = Params),
-%      std.map T get-args-to-compile.aux I,
-%      std.flatten I L.
-%
-%    pred get-args-to-compile i:term, o:list int.
-%    get-args-to-compile T L :-
-%      get-args-to-compile.gather T 0 L1 Avoid',
-%      mergesort L1 L2,
-%      undup L2 L3,
-%      mergesort Avoid' Avoid'',
-%      undup Avoid'' Avoid,
-%      sorted-diff L3 Avoid L.
-
-
-    % [translate-ty T Args TSort TClass] asserts that T is a type that
-    % ends in a record with two projections (our best approximation for structures declared by us). It produces two
-    % types TSort and TClass obtained from T by replacing the structure with its sort and class projection respectively.
-%    pred translate-ty i:term, i:list term, o:term, o:term -> term.
-%    translate-ty (prod N T TBody) Args (prod N T TSort) (xs\ prod N T (TClass xs)) :-
-%      pi x\ translate-ty (TBody x) [x|Args] (TSort x) (xs\ TClass xs x).
-%    translate-ty T Args TSort TClass :- std.do! [
-%      coq.safe-dest-app T (global (indt S)) Params,
-%      coq.env.record? S _,
-%      coq.env.projections S [some SortP, some ClassP],
-%      @pi-decl _ T x\ sigma Paramsx SortPx ClassPx TClass'\ std.do! [
-%        std.append Params [x] Paramsx,
-%        if (coq.env.primitive-projection? SortPP SortP SortPN)
-%          (SortPx = app [primitive (proj SortPP SortPN), x])
-%          (coq.mk-app (global (const SortP)) Paramsx SortPx),
-%        coq.mk-app (global (const ClassP)) Paramsx ClassPx,
-%        coq.typecheck SortPx TSort ok,
-%        coq.typecheck ClassPx TClass' ok,
-%        pi xs\ sigma args xargs\
-%          std.rev Args args,
-%          coq.mk-app xs args xargs,
-%          (copy SortPx xargs) => copy TClass' (TClass xs)] ].
-%
-%    % [mk-copy-clauses T X Xs Xc Args CopyClauses BuildSX] fully applies (X : T), Xs and Xc
-%    % to their arguments, asserts that T ends in a record S and produces copy clauses turning S.sort X into Xs,
-%    % S.class X into Xc and X into S.Pack Xs Xc. BuildSX is the term we copy X to when it is not applied.
-%    pred mk-copy-clauses i:term, i:term, i:term, i:term, i:list term, o:list prop, o:term.
-%    mk-copy-clauses (prod N T' T) X Xs Xc Args CC (fun N T' (x\ BuildSX x)) :-
-%      pi x\ sigma CCx\ mk-copy-clauses (T x) X Xs Xc [x|Args] CCx (BuildSX x),
-%        ((CCx = [C1 x, C2 x, C3 x, C4 x], CC = [(pi x\ C1 x), (pi x\ C2 x), (pi x\ C3 x), (pi x\ C4 x)]);
-%          (CCx = [C1 x, C2 x], CC = [(pi x\ C1 x), (pi x\ C2 x)])).
-%
-%    mk-copy-clauses T X Xs Xc Args' CC BuildSX :- std.do! [
-%      coq.safe-dest-app T (global (indt S)) Params,
-%      coq.env.indt S _ _ _ _ [BuildS] _,
-%      coq.env.projections S [some SortP, some ClassP],
-%      std.rev Args' Args,
-%      coq.mk-app X Args XArgs,
-%      coq.mk-app Xs Args XsArgs,
-%      coq.mk-app Xc Args XcArgs,
-%      std.append Params [XArgs] ParamsX,
-%      coq.mk-app (global (const SortP)) ParamsX SortPX,
-%      coq.mk-app (global (const ClassP)) ParamsX ClassPX,
-%      if (coq.env.primitive-projection? SortPP SortP SortPN,
-%          coq.env.primitive-projection? ClassPP ClassP ClassPN)
-%        (SortPX' = app [primitive (proj SortPP SortPN), XArgs],
-%          ClassPX' = app [primitive (proj ClassPP ClassPN), XArgs],
-%          CC = [ (copy SortPX XsArgs :- !),
-%          (copy ClassPX XcArgs :- !),
-%          (copy SortPX' XsArgs :- !),
-%          (copy ClassPX' XcArgs :- !) ])
-%        (CC = [ (copy SortPX XsArgs :- !),
-%          (copy ClassPX XcArgs :- !) ]),
-%      coq.mk-app (global (indc BuildS)) {std.append Params [XsArgs, XcArgs]} BuildSX ].
-%
-%    pred check-progress i:term, i:term.
-%    check-progress (prod N T B1) (prod _ _ B2) :- !,
-%      @pi-decl N T x\ check-progress (B1 x) (B2 x).
-%    check-progress (app L1) (app L2) :- !,
-%      std.last L1 T1,
-%      std.last L2 T2,
-%      not (T1 = T2).
-%
-%    pred avoid-pattern i:term, i:term.
-%    avoid-pattern Pat (prod N T B) :- !,
-%      @pi-decl N T x\ avoid-pattern Pat (B x).
-%    avoid-pattern Pat (app L) :- !,
-%      std.last L X,
-%      not (Pat = X).
-
-    %pred abstract-params i:term, i:list term, i:term, i:term, o:term, o:term.
-    %abstract-params (prod N Ty TBody) [P|Args] T X RT RX :-
-    %  (@pi-decl N Ty x\ abstract-params (TBody x) Args T X (T'' x) (X'' x),
-    %    copy P x => (copy (T'' x) (T' x),
-    %      copy (X'' x) (X' x))
-    %  ),
-    %  RT = prod N Ty (x\ prod _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ T' x)),
-    %  RX = fun N Ty (x\ fun _ {{ @unify lp:Ty lp:Ty lp:x lp:P nomsg }} (u\ X' x)).
-    %abstract-params _ _ T X T X.
-  }
-
-  pred copy! i:term, o:term.
-  copy! T T' :- copy T T', !.
-
-% simpl-tc-instance (prod _ T _) X TR XR asserts that TR is of the form
-  % (prod Sort _ (x\ prod Class _ _)) when T is a structure and SortP and ClassP
-  % are its projections. X is of type (prod _ T _) and XR of type TR, such that XR s c = X (Pack s c).
-  % If X = ClassP _, we fail.
-  %pred simpl-tc-instance i:term, i:term, o:term, o:term.
-  %simpl-tc-instance (prod N T TBody) X RT RX :- 
-  %  simpl-tc-instance.translate-ty T [] TSort TClass,
-  %  @pi-decl N T x\ @pi-decl _ TSort xs\ @pi-decl _ (TClass xs) xc\ sigma CopyClauses Bx TBody' TBody''\
-  %    simpl-tc-instance.mk-copy-clauses T x xs xc [] CopyClauses Bx,
-  %    CopyClauses => copy! (TBody x) TBody',
-  %    simpl-tc-instance.avoid-pattern xs TBody',
-  %    simpl-tc-instance.check-progress (TBody x) TBody',
-  %    copy x Bx => copy! TBody' TBody'',
-  %    not (simpl-tc-instance.check-progress TBody' TBody''), !,
-  %    simpl-tc-instance TBody'' {coq.mk-app X [Bx]} (TRx xs xc) (Rx xs xc),
-  %    RT = prod _ TSort (xs\ prod _ (TClass xs) (xc\ TRx xs xc)),
-  %    RX = fun _ TSort (xs\ fun _ (TClass xs) (xc\ Rx xs xc)).
-  %simpl-tc-instance (prod N T TBody) X (prod N T TRx) (fun N T Rx) :- !,
-  %  @pi-decl N T x\ simpl-tc-instance (TBody x) {coq.mk-app X [x]} (TRx x) (Rx x).
-  %simpl-tc-instance T ((app [Class|CArgs]) as X) T' X' :-
-  %  std.rev CArgs [Subject|RevParams],
-  %  std.rev RevParams Params,
-  %  coq.typecheck Class TClass ok,
-  %  simpl-tc-instance.abstract-params TClass Params T X T0 X0,
-  %  coq.safe-dest-app Subject Key Args,
-  %  coq.typecheck Key TKey ok,
-  %  simpl-tc-instance.abstract-params TKey Args T0 X0 T' X'.
-  %simpl-tc-instance T I T I :- !.
-
-  pred get-evars i:term, o:list term.
-  get-evars X [X] :- var X, !.
-  get-evars (app L) E :-
-    std.map L get-evars EL,
-    std.flatten EL E.
-  get-evars (fun _ T B) E :-
-    get-evars T ET,
-    (pi x\ get-evars (B x) EB),
-    std.append ET EB E.
-  get-evars (prod _ T B) E :-
-    get-evars T ET,
-    (pi x\ get-evars (B x) EB),
-    std.append ET EB E.
-  get-evars (let _ T X B) E :-
-    get-evars T ET,
-    get-evars X EX,
-    (pi x\ get-evars (B x) EB),
-    std.append EX EB EXB,
-    std.append ET EXB E.
-  get-evars _ [].
-
-  pred get-evars i:term, o:list term.
-  get-evars X [X] :- var X, !.
-  get-evars (app L) E :-
-    std.map L get-evars EL,
-    std.flatten EL E.
-  get-evars (fun _ T B) E :-
-    get-evars T ET,
-    (pi x\ get-evars (B x) EB),
-    std.append ET EB E.
-  get-evars (prod _ T B) E :-
-    get-evars T ET,
-    (pi x\ get-evars (B x) EB),
-    std.append ET EB E.
-  get-evars (let _ T X B) E :-
-    get-evars T ET,
-    get-evars X EX,
-    (pi x\ get-evars (B x) EB),
-    std.append EX EB EXB,
-    std.append ET EXB E.
-  get-evars _ [].
-
-  func mem-var list term -> term.
-  mem-var [X|_] Y :- X == Y, !.
-  mem-var [_|L] Y :- mem-var L Y.
-
-  pred mem-sealed-goal i:list sealed-goal, i:sealed-goal.
-  mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y.
-  mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
-
   %FIXME: may be incorrect, two goals may be on the same evar but have their nablas in different orders. Is there a way to get the evar (unapplied) from the goal?
   pred eq-sealed-goal i:sealed-goal, i:sealed-goal.
   eq-sealed-goal (nabla G) (nabla G2) :- pi x\ eq-sealed-goal (G x) (G2 x).
@@ -350,9 +114,9 @@ namespace hb {
   eq-sealed-goal G (nabla G2) :- pi x\ eq-sealed-goal G (G2 x).
   eq-sealed-goal (seal (goal _ _ _ E _)) (seal (goal _ _ _ E2 _)) :- E == E2.
 
-  %pred get-sealed-goal-evar i:sealed-goal, o:term.
-  %get-sealed-goal-evar (nabla G) T :-
-  %  pi x\ get-sealed-goal-evar (G x) (T' x),
+  pred mem-sealed-goal i:list sealed-goal, i:sealed-goal.
+  mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y.
+  mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
 
   pred has-compiled.
 
@@ -364,7 +128,6 @@ namespace hb {
     std.append Params SArgs ParamsSArgs,
     std.append HParams HSArgs HParamsSArgs,
     coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, Proof]} C,
-    %std.append HParams HSArgs H,
     if (HArgs = []) (Conds0 = []) (Conds0 = [std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok)]),
     (pi ginit gfinal\
       if (HParamsSArgs = []) (Conds1 ginit = [ginit = []|Conds0]) (
@@ -392,8 +155,6 @@ namespace hb {
             mem-sealed-goal ginit g;
             sigma gs\
               coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g gs
-              %Not checking is dangerous...
-              %,gs = []
             ))|Conds3 ginit]),
       std.rev (Conds4 ginit gfinal : list prop) (Conds5 ginit gfinal)),
     Clause = (pi ginit gfinal\ C :- Conds5 ginit gfinal).
@@ -408,7 +169,6 @@ namespace hb {
     coq.typecheck T TTy ok,
     @pi-decl _ TTy t\ pi a\
       compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams (prod N t a) [T] [Body] SArgs RHSArgs (Clause t a).
-  %TODO: fun
   compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
     compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams K [] [] SArgs RHSArgs Clause.
 
@@ -646,6 +406,11 @@ pred is-factory o:gref.
 % see also sub-class? which computes it on the fly
 :index (2 2 1)
 pred sub-class o:classname, o:classname, o:constant, o:int.
+
+% Sparser relation equivalent to [sub-class]
+:index (2 2)
+pred sub-class-edge o:classname, o:classname.
+
 
 % [gref->deps GR MLwP] is a (pre computed) list of dependencies of a know global
 % constant. The list is topologically sorted
