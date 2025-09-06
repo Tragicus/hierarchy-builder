@@ -113,8 +113,8 @@ add-to-neighbours _ (pr K V) A A1 :- coq.gref.map.find K A L, !, coq.gref.map.ad
 add-to-neighbours _ (pr K V) A A1 :- coq.gref.map.add K {coq.gref.set.add V {coq.gref.set.empty} } A A1.
 
 :index(1)
-func toposort list (pair gref gref), list gref -> list gref.
-toposort ES XS XS'' :- !,
+func toposort' list (pair gref gref), list gref -> list gref.
+toposort' ES XS XS'' :- !,
   std.fold XS {coq.gref.set.empty} coq.gref.set.add VS,
   std.fold ES {coq.gref.map.empty} (add-to-neighbours VS) EM,
   toporec EM XS {coq.gref.set.empty} [] {coq.gref.set.empty} _ XS'' _

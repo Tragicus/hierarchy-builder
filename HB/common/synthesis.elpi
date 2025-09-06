@@ -106,11 +106,10 @@ local-canonical-mixins-of T MSL :- std.do! [
 % Given TheType and a factory instance (on it), makes all the mixins provided by
 % the factory available for inference.
 func under-mixin-src-from-factory.do! term, term, list prop.
-under-mixin-src-from-factory.do! TheType TheFactory LP :- std.do! [
+under-mixin-src-from-factory.do! TheType TheFactory LP :-
   private.factory-instance->new-mixins [] TheFactory ML,
   std.map ML (m\c\ c = mixin-src TheType m TheFactory) MLClauses,
-  MLClauses => std.do! LP
-].
+  MLClauses => std.do! LP.
 
 % Given TheType and a factory instance (on it), builds all the *new* mixins
 % provided by the factory available for and passes them to the given
@@ -184,7 +183,7 @@ namespace private {
 % [mixin-for T M MI] synthesizes an instance of mixin M on type T using
 % the databases [mixin-src] and [from]
 func mixin-for term, mixinname -> term.
-mixin-for T M MICompressed :- std.do! [ mixin-src T M Tm,
+mixin-for T M MICompressed :- mixin-src T M Tm, !,
   %if-verbose (coq.say {header} "Trying to infer mixin for" M),
   std.assert-ok! (coq.typecheck Tm Ty) "mixin-for: Tm illtyped",
 
@@ -198,8 +197,7 @@ mixin-for T M MICompressed :- std.do! [ mixin-src T M Tm,
   ),
 
   %if-verbose (coq.say {header} "Trying to compress mixin for" {coq.term->string MI}),
-  compress-coercion-paths MI MICompressed,
-].
+  compress-coercion-paths MI MICompressed.
 
 func drop int, list A -> list A.
 drop 0 L L :- !.

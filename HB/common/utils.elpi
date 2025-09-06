@@ -26,10 +26,6 @@ with-locality P :-
 func acc-clause scope, prop.
 acc-clause Scope C :- coq.elpi.accumulate Scope "tc.db" (clause _ _ C).
 
-pred do-verbose! i:list prop.
-do-verbose! L :- get-option "verbose" tt, std.spy-do! L.
-do-verbose! L :- std.do! L.
-
 pred simpl-proj i:term, o:term.
 simpl-proj (app[global (const C)| Args]) Red :-
   coq.env.projection? C NParams,
