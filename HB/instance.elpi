@@ -151,7 +151,11 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
   params->holes MLwP Params,
   get-constructor Class KC,
 
+	if-verbose (coq.say {header} "infering all args for" {nice-gref->string Struct} "on"
+		{coq.term->string T}),
   synthesis.infer-all-args-let Params T KC KCApp' ok,
+	if-verbose (coq.say {header} "elaborating" KCApp' "for" {nice-gref->string Struct} "on"
+		{coq.term->string T}),
   coq.elaborate-skeleton KCApp' _ KCApp _,
 	if-verbose (coq.say {header} "we can build a" {nice-gref->string Struct} "on"
 		{coq.term->string T}),

@@ -177,7 +177,7 @@ toposort-proj Proj ES In Out :- !, toposort-proj.acc Proj ES [] In Out.
 func topo-find B -> A.
 func toposort-proj.acc (pred i:A, o:gref), list (pair gref gref), list gref, list A -> list A.
 toposort-proj.acc _ ES Acc [] Out :- !,
-  std.map {std.gref.toposort' ES Acc} topo-find Out, !.
+  std.map {std.gref.toposort ES Acc} topo-find Out, !.
 toposort-proj.acc Proj ES Acc [A|In] Out :- std.do![
   Proj A B,
   topo-find B A => toposort-proj.acc Proj ES [B|Acc] In Out
@@ -190,7 +190,7 @@ func toposort-classes list classname -> list classname.
 toposort-classes In Out :- std.do! [
   std.findall (sub-class-edge C1_ C2_) SubClasses,
   std.map SubClasses (x\ r\ sigma c1 c2\ x = sub-class-edge c1 c2, r = pr c2 c1) ES,
-  std.gref.toposort' ES In Out,
+  std.gref.toposort ES In Out,
 ].
 
 func findall-classes -> list hbclass.

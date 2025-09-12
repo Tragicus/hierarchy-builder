@@ -133,11 +133,11 @@ declare Module BSkel Sort :- std.do! [
 
   if-verbose (coq.say {header} "making coercion from type to target"),
   (synthesis.infer-coercion-tgt MLwP CoeClass; true),
-  if (not (var CoeClass), SortProjection = global _)
+  if (var CoeClass)
+	  (if-arg-sort (private.declare-sort-coercion-elpi Structure (global (const ArgSortCst))),
+    private.declare-sort-coercion-elpi Structure SortProjection)
     (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
-    private.declare-sort-coercion CoeClass Structure SortProjection)
-	 (if-arg-sort (private.declare-sort-coercion-elpi Structure (global (const ArgSortCst))),
-    private.declare-sort-coercion-elpi Structure SortProjection),
+    private.declare-sort-coercion CoeClass Structure SortProjection),
 
   private.declare-generic-coercion-elpi Structure,
 
@@ -308,23 +308,16 @@ mk-sort-coercion-aux (prod _N _T Body) Structure P Args Clause :-
   pi x\ mk-sort-coercion-aux (Body x) Structure P [x | Args] (C x).
 
 mk-sort-coercion-aux _ Structure P Args (pi v\ Clause v) :-
-  get-constructor Structure Pack,
   std.rev Args ArgsRev,
   mk-app (global Structure) ArgsRev SArgs,
-  std.length Args NArgs,
   pi v\ sigma argsAll\ (
-    std.append ArgsRev [v] argsAll,
     if (P = primitive _)
-      (Clause v =
-        (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
-          if (v = app [global Pack|vargs]) (std.nth NArgs vargs w)
-            (w = app [P, v]),
-          coq.elaborate-skeleton w e r ok)))
-      (Clause v =
-        (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
-          if (v = app [global Pack|vargs]) (std.nth NArgs vargs w)
-            (mk-app P argsAll w),
-          coq.elaborate-skeleton w e r ok)))).
+      (argsAll = [v])
+      (std.append ArgsRev [v] argsAll),
+    (Clause v =
+      (pi ctx e r w vargs\ (coercion ctx v SArgs e r :-
+        mk-app P argsAll w,
+        coq.elaborate-skeleton w e r ok)))).
 
 pred mk-sort-coercion i:structure, i:term, o:prop.
 mk-sort-coercion Structure P Clause :-
@@ -609,12 +602,11 @@ declare-class+structure MLwP Sort
   std.assert-ok! (coq.typecheck-indt-decl ClassDeclaration) "declare-class: illtyped",
   (@primitive! => log.coq.env.add-indt ClassDeclaration ClassInd),
 
-  coq.env.projections ClassInd Projs,
+  get-projections ClassInd Projs,
   % TODO: put this code in a named clause
   w-params.nparams MLwP NParams,
-  std.map2 {list-w-params_list MLwP} Projs (m\ p\ r\ sigma P PP PC PN\
-    std.assert! (p = some PC) "BUG: we build a class with an anonymous field",
-    if (coq.env.primitive-projection? PP PC PN) (P = primitive (proj PP PN)) (P = global (const PC)),
+  std.map2 {list-w-params_list MLwP} Projs (m\ p\ r\ sigma P\
+    std.assert! (p = some P) "BUG: we build a class with an anonymous field",
     r = from (indt ClassInd) m P) Factories,
   AllFactories = [factory->nparams (indt ClassInd) NParams | Factories],
 
@@ -644,6 +636,10 @@ declare-sort-coercion CoeClass StructureName (global Proj) :-
   if-verbose (coq.say {header} "declare sort coercion"),
 
   log.coq.coercion.declare (coercion Proj 0 StructureName CoeClass).
+pred declare-sort-coercion i:class, i:structure, i:term.
+declare-sort-coercion CoeClass StructureName (primitive (proj Proj N)) :-
+  coq.env.primitive-projection? Proj C N,
+  declare-sort-coercion CoeClass StructureName (global (const C)).
 
 % Declares "sort" as a Coercion in elpi's coercion db Proj : Structurename >-> CoeClass.
 pred declare-sort-coercion-elpi i:structure, i:term.

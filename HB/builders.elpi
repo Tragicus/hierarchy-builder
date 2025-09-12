@@ -125,8 +125,10 @@ define-factory-operation _ _ _ _ none.
 define-factory-operation TheType Params TheFactory NHoles (some P) :-
   coq.mk-n-holes NHoles Holes,
   std.append Holes [TheFactory] Holes_Factory,
-  std.append Params [TheType|Holes_Factory] Args,
-  T = app[global (const P)|Args],
+  if (coq.env.primitive-projection? PP P PN)
+    (T = app [primitive (proj PP PN), TheType|Holes_Factory])
+    (std.append Params [TheType|Holes_Factory] Args,
+    T = app[global (const P)|Args]),
   std.assert-ok! (coq.typecheck T _) "Illtyped applied factory operation",
   coq.gref->id (const P) Name,
   @local! => log.coq.notation.add-abbreviation Name 0 T ff _.

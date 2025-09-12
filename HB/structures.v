@@ -21,6 +21,7 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
 
 (* ********************* structures ****************************** *)
+Set Primitive Projections.
 From elpi Require Import elpi coercion tc.
 
 From elpi.apps.tc.elpi Extra Dependency "tc_aux.elpi" as tc_aux.
@@ -88,34 +89,36 @@ get-structure-coercion S T (global F) :-
   coq.coercion.db-for (grefclass S) (grefclass T) L,
   if (L = [pr F _]) true (coq.error "No one step coercion from" S "to" T).
 
+func get-projections inductive -> list (option term).
+get-projections S Proj :-
+  coq.env.projections S ProjC,
+  std.map ProjC (c\ p\ sigma c' p' n\
+    if (c = some c')
+      (if (coq.env.primitive-projection? p' c' n) (p = some (primitive (proj p' n))) (p = some (global (const c'))))
+    (p = none)) Proj.
+
 func get-structure-sort-projection structure -> term.
 get-structure-sort-projection (indt S) Proj :- !,
-  coq.env.projections S L,
-  if (L = [some PC, _]) true (coq.error "No canonical sort projection for" S),
-  if (coq.env.primitive-projection? PP PC PN)
-    (Proj = primitive (proj PP PN))
-    (Proj = global (const PC)).
+  get-projections S L,
+  if (L = [some Proj, _]) true (coq.error "No canonical sort projection for" S).
 get-structure-sort-projection S _ :- coq.error "get-structure-sort-projection: not a structure" S.
 
 func get-structure-class-projection structure -> term.
 get-structure-class-projection (indt S) T :- !,
-  coq.env.projections S L,
-  if (L = [_, some PC]) true (coq.error "No canonical class projection for" S),
-  if (coq.env.primitive-projection? PP PC PN)
-    (T = primitive (proj PP PN))
-    (T = global (const PC)).
+  get-projections S L,
+  if (L = [_, some T]) true (coq.error "No canonical class projection for" S).
 get-structure-class-projection S _ :- coq.error "get-structure-class-projection: not a structure" S.
 
 namespace hb {
   %FIXME: may be incorrect, two goals may be on the same evar but have their nablas in different orders. Is there a way to get the evar (unapplied) from the goal?
-  pred eq-sealed-goal i:sealed-goal, i:sealed-goal.
-  eq-sealed-goal (nabla G) (nabla G2) :- pi x\ eq-sealed-goal (G x) (G2 x).
-  eq-sealed-goal (nabla G) G2 :- pi x\ eq-sealed-goal (G x) G2.
-  eq-sealed-goal G (nabla G2) :- pi x\ eq-sealed-goal G (G2 x).
+  func eq-sealed-goal sealed-goal, sealed-goal ->.
+  eq-sealed-goal (nabla G) (nabla G2) :- !, pi x\ eq-sealed-goal (G x) (G2 x).
+  eq-sealed-goal (nabla G) G2 :- !, pi x\ eq-sealed-goal (G x) G2.
+  eq-sealed-goal G (nabla G2) :- !, pi x\ eq-sealed-goal G (G2 x).
   eq-sealed-goal (seal (goal _ _ _ E _)) (seal (goal _ _ _ E2 _)) :- E == E2.
 
-  pred mem-sealed-goal i:list sealed-goal, i:sealed-goal.
-  mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y.
+  func mem-sealed-goal list sealed-goal, sealed-goal ->.
+  mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y, !.
   mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
 
   pred has-compiled.
@@ -135,7 +138,7 @@ namespace hb {
           sigma g gs\
             coq.ltac.collect-goals (app HParamsSArgs) g gs,
             std.append g gs ginit|Conds0]),
-      if (K = (prod N T Body))
+      if (K = (prod N T Body); K = (fun N T Body))
         (KT = [KT'],
         KBody = [KBody'],
         Conds2 ginit = [(
@@ -148,9 +151,9 @@ namespace hb {
         std.append HParamsSArgs [K|ParamsSArgs] H0,
         std.append HArgs H0 H1,
         Conds4 ginit gfinal = [
-          (sigma g gs\
+          ((sigma g gs\
             coq.ltac.collect-goals (app H1) g gs,
-            std.append g gs gfinal,
+            std.append g gs gfinal),
           std.forall gfinal (g\
             mem-sealed-goal ginit g;
             sigma gs\
@@ -169,6 +172,10 @@ namespace hb {
     coq.typecheck T TTy ok,
     @pi-decl _ TTy t\ pi a\
       compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams (prod N t a) [T] [Body] SArgs RHSArgs (Clause t a).
+  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (fun N T Body) SArgs RHSArgs (pi t a\ Clause t a) :- !,
+    coq.typecheck T TTy ok,
+    @pi-decl _ TTy t\ pi a\
+      compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams (fun N t a) [T] [Body] SArgs RHSArgs (Clause t a).
   compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
     compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams K [] [] SArgs RHSArgs Clause.
 
