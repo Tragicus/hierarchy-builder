@@ -333,8 +333,9 @@ mk-generic-coercion _ Structure Constructor Args Clause :-
   mk-app Constructor ArgsRev Cargs,
   mk-app Structure ArgsRev Sargs,
   coq.typecheck Cargs (prod _ T _) ok,
+  coq.locate "reverse_coercion" RC,
   Clause =
-    (pi ctx v t r v' c w wt g g'\ (coercion ctx v t Sargs r :-
+    (pi ctx v t r v' c w wt g g' univs ty\ (coercion ctx v t Sargs r :-
 		% N.B. I have to *not* use r here, otherwise elpi instanciates r temporarily with "app X", which
 		% fails because r is typechecked immediately and "app X" does not typecheck.
       coq.elaborate-skeleton v T v' ok,
@@ -343,7 +344,7 @@ mk-generic-coercion _ Structure Constructor Args Clause :-
       coq.ltac.collect-goals c [g] [], !,
       % TODO: fine tune the tactic below
       coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g g', !,
-      r = w, !)).
+      coq.elaborate-skeleton (app [pglobal RC univs, Sargs, T, w, v']) ty r ok, !)).
 
 pred mk-coe-class-body
   i:factoryname, % From class
@@ -751,7 +752,7 @@ pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
 ].
 
 % [packS-body Structure P T MLwA B] asserts
-%  B = fun m0 ... mn => Pack P T (Class P T m0 ... mn)
+%  B = fun c => Pack P T (Class P T c)
 % under a context with P and T
 pred packS-body i:classname, i:list term, i:term, i:list (w-args mixinname), o:term.
 packS-body ClassName PL T _MLwA F :- std.do! [
