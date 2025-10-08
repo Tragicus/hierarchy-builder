@@ -194,90 +194,118 @@ namespace hb {
         not (R = T))
       (R = U).
 
-  func compile.unfolding-clause gref, list term -> prop.
-  compile.unfolding-clause Class Params (pi x y x'\ Clause x y x') :-
-    tc.gref->pred-name Class PredName,
-		pi x y x'\ sigma args args' c c'\
-			std.append Params [x, y] args,
-			coq.elpi.predicate PredName args c,
-			std.append Params [x', y] args',
-			coq.elpi.predicate PredName args' c',
-			Clause x y x' = (c :- !, reduce x x', c').
-
-  func compile.try-rev-coercion gref, list term, term -> int, prop.
-  compile.try-rev-coercion Class ParamsF K Prio Clause :-
+  func compile.try-join gref, list term, term -> prop, prop.
+  compile.try-join (indt TC) ParamsT K (pi x y x'\ UClause x y x') (pi x y\ JClause x y) :-
+    %Check that the current clause being built is the identity clause (T.axioms_ (T.sort _)).
     if (K = primitive (proj P _)) (coq.projection->gref P (const PC)) (K = global (const PC)),
-    coq.env.projection-record? PC TStruct',
-    TStruct = indt TStruct',
-    class-def (class Class Struct _), !,
-    Class = indt ClassIndt,
-    coq.env.indt ClassIndt _ NParamsF _ _ _ _,
-    std.length ParamsF { calc (NParamsF - 1) },
-    if (Struct = TStruct) (compile.unfolding-clause Class ParamsF Clause, Prio = 100) (
-      class-def (class TC TStruct _), !,
-      tc.gref->pred-name TC PredName,
+    coq.env.projection-record? PC TStruct,
+    class-def (class (indt TC) (indt TStruct) _), !,
+    tc.gref->pred-name (indt TC) PredName,
 
-      get-structure-sort-projection Struct SortProjectionF,
-      TC = indt TCIndt,
-      coq.env.indt TCIndt _ NParamsT _ _ _ _,
-      w-holes { calc (NParamsT - 1) } (paramsT\ clause\ sigma scoercionP\
-        if (SortProjectionF = primitive _) (SortPF = SortProjectionF)
-          (coq.mk-app SortProjectionF ParamsF SortPF),
+    % Building TargetClassProjection
+    get-structure-class-projection (indt TStruct) TCPC,
+    if (TCPC = primitive _) (TCP = TCPC)
+      (coq.mk-app TCPC ParamsT TCP),
 
-        sub-class TC Class SCoercion _,
-        coq.mk-app (global (const SCoercion)) paramsT scoercionP,
+    % Build unfolding and join clauses
+    pi x y x'\ sigma args args' c c'\
+			std.append ParamsT [x, y] args,
+			coq.elpi.predicate PredName args c,
+			std.append ParamsT [x', y] args',
+			coq.elpi.predicate PredName args' c',
+			UClause x y x' = (c :- !, reduce x x', c'),
+      JClause x y =
+        (pi kargs k p pc pn s m sc jc nargs subject revkparams kparams coe revkparams kparams\ c :-
+          %Check that the subject is a projection...
+          coq.safe-dest-app x k kargs,
+          not (var k),
+          if (k = primitive (proj p pn)) (coq.projection->gref p (const pc)) (k = global (const pc)),
+          %... of class sc ...
+          coq.env.projection-record? pc s,
+          class-def (class (indt sc) (indt s) m),
+          not (TC = sc),
 
-        get-structure-class-projection TStruct ClassProjection,
-        if (ClassProjection = primitive _) (ClassP = ClassProjection)
-          (coq.mk-app ClassProjection ParamsF ClassP),
+          %... applied to the correct number of arguments
+          std.length kargs nargs,
+          if (k = primitive (proj p pn)) (nargs = 1)
+            (sigma n v0 v1 v2 v3 v4\ coq.env.indt sc v0 nargs v1 v2 v3 v4),
 
-        sigma clause'\
-          clause = (pi y x r\ clause' y x r),
-          pi y x r\ sigma c\
-            coq.elpi.predicate PredName {std.append paramsT [{coq.mk-app SortPF [x]}, r]} c,
-            clause' y x r = (pi xt paramst l\ c :-
-              coq.mk-app scoercionP [y] x,
-              coq.typecheck x xt ok,
-              coq.safe-dest-app xt l paramst,
-              std.forall2 paramst ParamsF (x\ y\ coq.unify-eq x y ok),
-              coq.mk-app ClassP [y] r)) Clause,
-        Prio = 0).
+          %Extract the subject of the projection
+          std.rev kargs [subject|revkparams],
+          std.rev revkparams kparams,
 
-  func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> prop, int, prop.
-  compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) RevPrio RevClause :-
+          %Computing join
+          join (indt TC) (indt sc) (indt jc),
+
+          %If we are projecting
+          if (jc = sc)
+            %We get the projection
+            (get-structure-coercion (indt s) (indt TStruct) coe,
+            %We compute the parameters
+            sigma paramsS paramsSx x\
+              if (k = primitive (proj p pn))
+                (sigma ty v\
+                  coq.typecheck subject ty ok,
+                  coq.safe-dest-app ty v paramsS)
+                (paramsS = kparams),
+              %We coerce the subject
+              std.append paramsS [subject] paramsSx,
+              coq.mk-app coe paramsSx x,
+              %And we extract the class
+              coq.mk-app TCP [x] y)
+            %If we have a real join, we introduce a fresh term x
+            (sigma js x n n' v0 v1 v2 v3 v4 h hx x' jm coet\
+              %We prepare the arguments of the coercions
+              coq.env.indt jc v0 n v1 v2 v3 v4,
+              calc (n - 1) n',
+              coq.mk-n-holes n' h,
+              std.append h [x] hx,
+              %We check that the subject is a coercion of x
+              class-def (class (indt jc) js jm),
+              get-structure-coercion js (indt s) coet,
+              coq.mk-app coet hx subject,
+              %We coerce x
+              if (jc = TC) (x' = x)
+                (get-structure-coercion js (indt TStruct) coe,
+                coq.mk-app coe hx x'),
+              %And we extract the class
+              coq.mk-app TCP [x'] y)).
+
+  func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> prop, prop, prop.
+  compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) UClause JClause :-
     coq.typecheck P T ok,
-    (@pi-decl _ T p\ compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p) RevPrio (RevClause' p)),
-    if (pi p\ var (RevClause' p)) true (RevClause = pi p\ RevClause' p).
+    (@pi-decl _ T p\ compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p) (UClause' p) (JClause' p)),
+    if (pi x\ var (UClause' x)) true ((UClause = pi x\ UClause' x), (JClause = pi x\ JClause' x)).
     
-  compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clause RevPrio RevClause :-
+  compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clause UClause JClause :-
     coq.safe-dest-app S K SArgs,
-    if (compile.try-rev-coercion Class Params K RevPrio RevClause) true true,
+    if (compile.try-join Class Params K UClause JClause) true true,
     compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
 
-  func compile.telescope term, term, list term, list term -> prop, int, prop.
-  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) RevPrio RevClause :-
-    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x) RevPrio (RevClause' x)),
-    if (pi x\ var (RevClause' x)) true (RevClause = pi x\ RevClause' x).
+  func compile.telescope term, term, list term, list term -> prop, prop, prop.
+  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) UClause JClause :-
+    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x) (UClause' x) (JClause' x)),
+    if (pi x\ var (UClause' x)) true ((UClause = pi x\ UClause' x), (JClause = pi x\ JClause' x)).
 
-  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause RevPrio RevClause :- !,
+  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause UClause JClause :- !,
     coq.TC.class? Class,
     tc.gref->pred-name Class PredName,
     std.rev PS [S|RP],
     std.rev RP Params,
-    compile.params Params Class PredName ProofHd HArgs TArgs Params [] S Clause RevPrio RevClause.
+    compile.params Params Class PredName ProofHd HArgs TArgs Params [] S Clause UClause JClause.
 
-  func compile term, term -> prop, int, prop.
-  compile Ty ProofHd Clause RevPrio RevClause :-
-    compile.telescope Ty ProofHd [] [] Clause RevPrio RevClause.
+  func compile term, term -> prop, prop, prop.
+  compile Ty ProofHd Clause UClause JClause :-
+    compile.telescope Ty ProofHd [] [] Clause UClause JClause.
 
-  func compile.instance-gr gref -> prop, int, prop.
+  func compile.instance-gr gref -> prop, prop, prop.
   % If the instance is polymorphic, we wrap its gref into the pglobal constructor
-  compile.instance-gr InstGR (pi x\ Clause x) RevPrio (pi x\ RevClause x) :- coq.env.univpoly? InstGR _, !,
+  compile.instance-gr InstGR (pi x\ Clause x) (pi x\ UClause x) (pi x\ JClause x) :- coq.env.univpoly? InstGR _, !,
     coq.env.typeof InstGR Ty,
-    (pi x\ compile Ty (pglobal InstGR x) (Clause x) RevPrio (RevClause x)).
-  compile.instance-gr InstGR Clause RevPrio RevClause :-
+    (pi x\ compile Ty (pglobal InstGR x) (Clause x) (UClause x) (JClause x)).
+  compile.instance-gr InstGR Clause UClause JClause :-
     coq.env.typeof InstGR Ty,
-    compile Ty (global InstGR) Clause RevPrio RevClause.
+    compile Ty (global InstGR) Clause UClause JClause.
 }
 
 func tc.gref->pred-name gref -> string.
@@ -294,10 +322,12 @@ namespace tc {
   func add-inst.aux gref, gref, list prop, grafting ->.
   add-inst.aux Inst TC Locality Grafting :-
     coq.env.current-section-path SectionPath,
-    hb.compile.instance-gr Inst Clause RevPrio RevClause, 
+    hb.compile.instance-gr Inst Clause UClause JClause, 
     tc.get-full-path Inst _ClauseName, !,
     (Locality => (
-      if (var RevClause) true (tc.add-tc-db _ (after {calc (int_to_string RevPrio)}) RevClause),
+      if (var UClause) true (
+        tc.add-tc-db _ (after {calc (int_to_string 100)}) UClause,
+        tc.add-tc-db _ (after {calc (int_to_string 100)}) JClause),
       tc.add-tc-db _ Grafting Clause, 
       tc.add-tc-db _ Grafting (tc.instance SectionPath Inst TC Locality))).
   add-inst.aux Inst _ _ _ :- !,!,
@@ -359,7 +389,8 @@ kind hbclass type.
 type class classname -> structure -> mixins -> hbclass.
 
 % class-def contains all the classes ever declared
-pred class-def o:hbclass.
+:index (10)
+pred class-def o:class.
 
 %%%%% Builders %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -424,7 +455,8 @@ pred sub-class-edge o:classname, o:classname.
 :index(2)
 func gref->deps gref -> mixins.
 
-% [join C1 C2 C3] means that C3 inherits from both C1 and C2
+% [join C1 C2 C3] means that C3 is the join of C1 and C2 in the hierarchy lattice
+:index (2 2 2)
 pred join o:classname, o:classname, o:classname.
 
 % Section local memory of names for mixins, so that we can reuse them
@@ -467,6 +499,7 @@ pred structure-key o:constant, o:constant, o:structure.
 
 %%%%%% Membership of mixins to a  class %%%%%%%%%%%%%%%%
 % [mixin-class M C] means M belongs to C
+:index (2 2)
 pred mixin-class o:mixinname, o:classname.
 
 %% database for HB.context %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -479,7 +512,8 @@ pred mixin-class o:mixinname, o:classname.
 pred mixin-src o:term, o:mixinname, o:term.
 
 % [has-mixin-instance K M G] states that G is a reference to an instance
-% of mixin M for subject K
+% of mixin M for subject K'
+:index (2 2 3)
 pred has-mixin-instance o:cs-pattern, o:mixinname, o:gref.
 
 %% database for HB.builders %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

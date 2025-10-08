@@ -11,6 +11,15 @@ func if-arg-sort (func) ->.
 if-arg-sort P :- get-option "arg_sort" tt, !, P.
 if-arg-sort _.
 
+func spy-verbose prop ->.
+spy-verbose P :- get-option "verbose" tt, !, std.spy P, !.
+spy-verbose P :- P, !.
+
+func std.do-verbose! list prop ->.
+std.do-verbose! [].
+std.do-verbose! [P|L] :-
+  spy-verbose P, !, std.do-verbose! L.
+
 func if-MC-compat (func option gref ->) ->.
 if-MC-compat P :- get-option "mathcomp" tt, !, P none.
 if-MC-compat P :- get-option "mathcomp.axiom" S, !,
