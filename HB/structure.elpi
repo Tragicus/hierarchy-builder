@@ -438,7 +438,6 @@ declare-coercion SortProjection ClassProjection
   gref->modname StructureT 2 "_" ModNameT,
   CName is ModNameF ^ "_class__to__" ^ ModNameT ^ "_class",
   SName is ModNameF ^ "__to__" ^ ModNameT,
-  SCName is ModNameF ^ "__to__" ^ ModNameT ^ "_class",
 
   if-verbose (coq.say {header} "declare coercion" SName),
 
@@ -483,14 +482,6 @@ declare-coercion SortProjection ClassProjection
   acc-clause current (sub-class FC TC SC NparamsSC),
   if (sigma c\ sub-class FC c _ _, sub-class c TC _ _) true
     (acc-clause current (sub-class-edge FC TC)),
-
-  w-params.then FMLwP mk-fun ignore
-    (mk-coe-structure-class-body StructureF StructureT TC Coercion SortProjection ClassProjection)
-    SCCoeBody,
-
-  std.assert-ok! (coq.elaborate-skeleton SCCoeBody SCTy SCCoeBody') ErrorMessage,
-  log.coq.env.add-const-noimplicits SCName SCCoeBody' SCTy @transparent! SCC,
-  coq.TC.declare-instance (const SCC) 1,
 ].
 
 pred join-body i:structure, i:classname, i:classname, i:term, i:term, i:term, i:term,
@@ -555,9 +546,7 @@ declare-unification-hints SortProj ClassProj CurrentClass NewJoins :- std.do! [
   std.filter All (sub-class? CurrentClass) AllSuper,
   std.forall AllSuper (declare-coercion SortProj ClassProj CurrentClass),
 
-  findall-newjoins CurrentClass AllSuper TodoJoins,
-
-  std.map TodoJoins (declare-join CurrentClass) NewJoins
+  findall-newjoins CurrentClass AllSuper NewJoins,
 ].
 
 % For each mixin we declare a field and apply the mixin to its dependencies

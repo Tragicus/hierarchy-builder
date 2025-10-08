@@ -266,8 +266,6 @@ distinct-pairs-below CurrentClass AllSuper C1 C2 :-
     cmp_term C1 C2 lt,
     C1 = class C1n _ _,
     C2 = class C2n _ _ ,
-    not(sub-class? C1 C2),
-    not(sub-class? C2 C1),
     if (join C1n C2n C3n)
        (assert-building-bottom-up CurrentClass C3n C1n C2n, fail) % a join, not a valid pair
        true, % no join, valid pair
@@ -290,13 +288,17 @@ assert-building-bottom-up CurrentClass C3n C1n C2n :-
        Msg2)
      true.
 
-func distinct-pairs_pair prop -> pair hbclass hbclass.
-distinct-pairs_pair (distinct-pairs-below _ _ X Y) (pr X Y).
-
-func findall-newjoins hbclass, list hbclass -> list (pair hbclass hbclass).
-findall-newjoins CurrentClass AllSuper TodoJoins :-
+func findall-newjoins class, list class -> list prop.
+findall-newjoins CurrentClass AllSuper Joins :-
   std.findall (distinct-pairs-below CurrentClass AllSuper C1_ C2_) JoinOf,
-  std.map JoinOf distinct-pairs_pair TodoJoins.
+  CurrentClass = class C _ _,
+  std.map AllSuper (c\ r\ sigma c'\ c = class c' _ _, r = join C c' C) Joins1,
+  std.map AllSuper (c\ r\ sigma c'\ c = class c' _ _, r = join c' C C) Joins2,
+  std.map JoinOf (c\ r\ sigma c1 c2\ c = (distinct-pairs-below _ _ (class c1 _ _) (class c2 _ _)), r = join c1 c2 C) Joins3,
+  std.map JoinOf (c\ r\ sigma c1 c2\ c = (distinct-pairs-below _ _ (class c1 _ _) (class c2 _ _)), r = join c2 c1 C) Joins4,
+  std.append Joins1 Joins2 Joins12,
+  std.append Joins12 Joins3 Joins123,
+  std.append Joins123 Joins4 Joins.
 
 func class-coverage list classname -> coq.gref.set.
 class-coverage CNL CSet :-

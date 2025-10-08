@@ -145,8 +145,68 @@ has-instance T Struct :-
                     {coq.term->string T}))
      fail. % we build it
 
+func reduce-projs term -> term.
+reduce-projs (fun N Ty Body) (fun N Ty' Body') :- !,
+  reduce-projs Ty Ty',
+  pi x\ reduce-projs (Body x) (Body' x).
+reduce-projs (prod N Ty Body) (prod N Ty' Body') :- !,
+  reduce-projs Ty Ty',
+  pi x\ reduce-projs (Body x) (Body' x).
+reduce-projs (let N Ty Body Ctx) (let N Ty' Body' Ctx') :- !,
+  reduce-projs Ty Ty',
+  reduce-projs Body Body',
+  pi x\ reduce-projs (Ctx x) (Ctx' x).
+reduce-projs (match T P B) (match T' P' B') :- !,
+  std.map [T,P|B] reduce-projs [T',P'|B'].
+reduce-projs (fix N I Ty Body) (fix N I Ty' Body') :- !,
+  reduce-projs Ty Ty',
+  pi x\ reduce-projs (Body x) (Body' x).
+reduce-projs (app L) R :- !,
+  std.map L reduce-projs L',
+  if (L' = [primitive (proj _ N),app [S|Args]|L''], not (var S), S = global (indc _))
+    (std.nth N Args Arg,
+    coq.mk-app Arg L'' R',
+    reduce-projs R' R)
+    (R = app L').
+reduce-projs T T.
+
+func get-goal-class-and-subject sealed-goal -> classname, term.
+get-goal-class-and-subject (nabla G) C S :- pi x\ get-goal-class-and-subject (G x) C S.
+get-goal-class-and-subject (seal (goal _ _ G _ _)) C S :-
+  not (var G),
+  coq.safe-dest-app G GC L,
+  not (var GC),
+  GC = global C,
+  not (var C),
+  class-def (class C _ _),
+  std.rev L [S|_],
+  not (var S),
+  !.
+
+func factorize-goals list (pair term (pair classname sealed-goal)) -> list sealed-goal.
+factorize-goals [] [].
+factorize-goals [pr S (pr C G)|SCGs] [G0|R] :-
+  std.partition SCGs (scg\ scg = pr S _) SCG0s SCG1s,
+  %More than an optimization, this `if` avoids losing parameters.
+  if (SCG0s = []) (G0 = G) (
+    std.fold SCG0s C (scg\c\c0\ sigma c1\ scg = pr _ (pr c1 _), join c c1 c0) C0,
+    factory->nparams C0 N,
+    coq.mk-n-holes N H,
+    std.append H [S] HS,
+    coq.typecheck X (app [global C0|HS]) ok,
+    coq.ltac.collect-goals X [G0] []),
+  factorize-goals SCG1s R, !.
+
+func rev-sort-windex list A, list (pair A B) -> list B.
+rev-sort-windex [] [] [].
+rev-sort-windex [C|Cs] Gs R :-
+  std.map-filter Gs (x\r\ x = pr C r) Gs0,
+  std.filter Gs (x\ not (x = pr C _)) Gs1,
+  rev-sort-windex Cs Gs1 R0,
+  std.append Gs0 R0 R.
+
 func infer-class term, classname, gref, factories -> term, string, term, list prop.
-infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
+infer-class T Class Struct MLwP S Name STy Clauses :- std.do-verbose![
 
   params->holes MLwP Params,
   get-constructor Class KC,
@@ -154,9 +214,17 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
 	if-verbose (coq.say {header} "infering all args for" {nice-gref->string Struct} "on"
 		{coq.term->string T}),
   synthesis.infer-all-args-let Params T KC KCApp' ok,
-	if-verbose (coq.say {header} "elaborating" KCApp' "for" {nice-gref->string Struct} "on"
-		{coq.term->string T}),
-  coq.elaborate-skeleton KCApp' _ KCApp _,
+	if-verbose (coq.say {header} "reducing projections"),
+  reduce-projs KCApp' KCApp'',
+	if-verbose (coq.say {header} "elaborating" KCApp''),
+  %I should not have to take the shelved goals, but it may happen that collect-goals shelves too many goals because it considers an evar's context instead of only its conclusion.
+  coq.ltac.collect-goals KCApp'' Gs0 Gs1,
+  std.append Gs0 Gs1 Gs2,
+  std.map-filter Gs2 (x\r\ sigma c s\ get-goal-class-and-subject x c s, r = pr s (pr c x)) SCGs,
+  factorize-goals SCGs Gs,
+	if-verbose (coq.say {header} "solving goals " Gs),
+  coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs _,
+  coq.elaborate-skeleton KCApp'' _ KCApp ok,
 	if-verbose (coq.say {header} "we can build a" {nice-gref->string Struct} "on"
 		{coq.term->string T}),
 
@@ -169,7 +237,11 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
   private.optimize-class-body THD {std.length Params} KCApp S Clauses,
   if-verbose (coq.say {header} "structure instance for" Name "is" {coq.term->string S}),
 
-  coq.typecheck S STy ok, % failure may be due to a parameter not rich enough see #435
+  coq.typecheck S STy Diag,
+  if (Diag = ok) true (
+    if-verbose (coq.say {header} "typechecking fails, the parameters may not be rich enough"),
+    fail),
+  % failure may be due to a parameter not rich enough see #435
      
 ].
 
@@ -274,26 +346,33 @@ mk-factory-sort-factory AliasGR CFL CSL :- std.do! [
 func saturate-instances cs-pattern ->.
 saturate-instances Filter :- std.do! [
 
+  if-verbose (coq.say {header} "enter HB.saturate"),
   findall-has-mixin-instance Filter ClausesHas,
 
+  if-verbose (coq.say {header} "listed all mixin instances"),
   std.map ClausesHas has-mixin-instance_key KL,
   undup-cs-patterns KL UKL,
   std.map UKL cs-pattern->term TL,
+  if-verbose (coq.say {header} "got all keys"),
 
   findall-classes AllClasses,
+  if-verbose (coq.say {header} "got all classes"),
 
   std.map ClausesHas has-mixin-instance->mixin-src Clauses,
+  if-verbose (coq.say {header} "prepared mixin instances"),
   
-  Clauses => std.map2 TL UKL (t\k\CI\sigma Classes\
+  Clauses => std.forall2 TL UKL (t\k\sigma Classes\
+    if-verbose (coq.say {header} "saturating key" k),
     std.filter AllClasses (no-instance-for k) Classes,
+    if-verbose (coq.say {header} {std.length Classes} "instances to declare"),
     declare-all-on-type-constructor t Classes _),
 ].
 
-func no-instance-for cs-pattern, hbclass ->.
-no-instance-for K (class _ S _) :-
-  get-structure-sort-projection S P,
-  if (P = primitive (proj PP _)) (coq.projection->gref PP PC) (P = global PC),
-  coq.CS.db-for PC K [].
+func no-instance-for cs-pattern, class ->.
+no-instance-for K (class C S _) :-
+  not (has-canonical-structure-on K S),
+  std.findall (mixin-class _ C) MC,
+  std.forall MC (mc\ sigma m\ mc = mixin-class m _, has-mixin-instance K m _, !).
 
 /* ------------------------------------------------------------------------- */
 /* ----------------------------- private code ------------------------------ */
