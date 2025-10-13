@@ -491,6 +491,7 @@ declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.d
   % as they are the ones which guarantee forgetful inheritance
   % hence we add these clauses last.
 	synthesis.local-canonical-mixins-of T MLCano,
+  if-verbose (coq.say {header} "MLCano" MLCano),
   synthesis.under-mixin-src-from-factory.do! T F [
     MLCano => std.do! [
       list-w-params_list {factory-provides Factory} ML,
