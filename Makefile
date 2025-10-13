@@ -58,7 +58,6 @@ export COQVVV
 all: 
 	$(MAKE) config
 	$(MAKE) build
-	$(MAKE) test-suite
 
 # Makefile.coq: ------------------------------------------------------
 
