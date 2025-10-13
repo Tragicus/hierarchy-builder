@@ -224,6 +224,7 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do-verbose![
   factorize-goals SCGs Gs,
 	if-verbose (coq.say {header} "solving goals " Gs),
   coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs _,
+  coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs2 _,
 	if-verbose (coq.say {header} "sigma ", coq.sigma.print),
 	if-verbose (coq.say {header} "KCApp " {coq.term->string KCApp''}),
   coq.typecheck KCApp'' _ ok,
