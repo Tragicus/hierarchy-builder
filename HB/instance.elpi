@@ -223,13 +223,8 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do-verbose![
   std.map-filter Gs2 (x\r\ sigma c s\ get-goal-class-and-subject x c s, r = pr s (pr c x)) SCGs,
   factorize-goals SCGs Gs,
 	if-verbose (coq.say {header} "solving goals " Gs),
-	if-verbose (coq.say {header} "Hello, world!"),
   coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs _,
-  coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs2 _,
-	if-verbose (coq.say {header} "sigma ", coq.sigma.print),
-	if-verbose (coq.say {header} "KCApp " {coq.term->string KCApp''}),
-  coq.typecheck KCApp'' _ ok,
-  KCApp = KCApp'',
+  coq.elaborate-skeleton KCApp'' _ KCApp ok,
 	if-verbose (coq.say {header} "we can build a" {nice-gref->string Struct} "on"
 		{coq.term->string T}),
 
@@ -493,7 +488,6 @@ declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.d
   % as they are the ones which guarantee forgetful inheritance
   % hence we add these clauses last.
 	synthesis.local-canonical-mixins-of T MLCano,
-  if-verbose (coq.say {header} "MLCano" MLCano),
   synthesis.under-mixin-src-from-factory.do! T F [
     MLCano => std.do! [
       list-w-params_list {factory-provides Factory} ML,
