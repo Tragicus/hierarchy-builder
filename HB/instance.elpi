@@ -205,6 +205,10 @@ rev-sort-windex [C|Cs] Gs R :-
   rev-sort-windex Cs Gs1 R0,
   std.append Gs0 R0 R.
 
+% [infer-class T Class Struct MLwP S Name STy Clauses] with input
+% - T the subject
+% - Class, Struct and MLwP the class's gref, associated structure and mixin contents.
+% produces an instance S of Class on the subject T with type STy and generated name Name. For every mixin which has no locally declared associated gref, it declares a new gref and a clause for `mixin-mem`.
 func infer-class term, classname, gref, factories -> term, string, term, list prop.
 infer-class T Class Struct MLwP S Name STy Clauses :- std.do-verbose![
 
