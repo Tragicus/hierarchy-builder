@@ -305,7 +305,9 @@ declare-mixin-or-factory MixinSrcClauses SectionCanonicalInstance
     % gref->deps GRFSort MLwP,
     % factory-sort FactorySortCoe,
   ]] NewClauses,
+  if-verbose (coq.say {header} "accumulating " NewClauses),
   acc-clauses current NewClauses,
+  if-verbose (coq.say {header} "accumulated clauses"),
 
   list-w-params_list MLwP MLwoP,
   std.map MLwoP (_\ r\ r = maximal) Implicits,

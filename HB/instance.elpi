@@ -210,7 +210,7 @@ rev-sort-windex [C|Cs] Gs R :-
 % - Class, Struct and MLwP the class's gref, associated structure and mixin contents.
 % produces an instance S of Class on the subject T with type STy and generated name Name. For every mixin which has no declared associated gref, it declares a new gref and a clause for `mixin-mem`.
 func infer-class term, classname, gref, factories -> term, string, term, list prop.
-infer-class T Class Struct MLwP S Name STy Clauses :- std.do-verbose![
+infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
 
   params->holes MLwP Params,
   get-constructor Class KC,
@@ -231,7 +231,7 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do-verbose![
   std.map SCGs (scg\g\ scg = pr _ (pr _ g)) Gs3,
   coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs3 _,
 	if-verbose (coq.say {header} "KCApp " {coq.term->string KCApp''}),
-  coq.elaborate-skeleton KCApp'' _ KCApp ok,
+  ((coq.typecheck KCApp'' _ ok, KCApp = KCApp''); coq.elaborate-skeleton KCApp'' _ KCApp ok),
 	if-verbose (coq.say {header} "we can build a" {nice-gref->string Struct} "on"
 		{coq.term->string T}),
 
