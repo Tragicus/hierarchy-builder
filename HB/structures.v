@@ -121,63 +121,58 @@ namespace hb {
   mem-sealed-goal [X|_] Y :- eq-sealed-goal X Y, !.
   mem-sealed-goal [_|L] Y :- mem-sealed-goal L Y.
 
+  func goal->concl sealed-goal -> term.
+  goal->concl (nabla G) C :- pi x\ goal->concl (G x) C.
+  goal->concl (seal (goal _ _ G _ _)) G.
+
+  func goal-is-class sealed-goal ->.
+  goal-is-class (nabla G) :- pi x\ goal-is-class (G x).
+  goal-is-class (seal (goal _ _ G _ _)) :-
+    not (var G),
+    coq.safe-dest-app G GC _,
+    not (var GC),
+    GC = global C,
+    not (var C),
+    class-def (class C _ _), !.
+
   pred has-compiled.
 
-  func compile.mk-clause list term, string, term, list term, list term, list term, list term, term, list term, list (term -> term), list term, list term -> prop.
-  compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams K KT KBody SArgs RHSArgs Clause :-
-    std.forall2 [RHArgs, RTArgs, RHParams, RHSArgs] [HArgs, TArgs, HParams, HSArgs] std.rev,
-    coq.mk-app ProofHd HArgs Proof,
+  func compile.mk-clause gref, string, term, list term, list term, list term, list term, term, prop, list term -> prop.
+  compile.mk-clause _Class PredName ProofHd RHHyps RTHyps RevArgs HRArgs HA PA HLArgs Clause :-
+    std.map [RHHyps, RTHyps, RevArgs] std.rev [HHyps, THyps, Args],
+    coq.mk-app ProofHd HHyps Proof,
     coq.typecheck Proof _ ok, %This instantiates the parameters, if applicable
-    std.append Params SArgs ParamsSArgs,
-    std.append HParams HSArgs HParamsSArgs,
-    coq.elpi.predicate PredName {std.append HParams [{coq.mk-app K HSArgs}, Proof]} C,
-    if (HArgs = []) (Conds0 = []) (Conds0 = [std.forall2 HArgs TArgs (x\ t\ coq.typecheck x t ok)]),
+    if (var HA) (HArgs = HRArgs, RArgs = Args)
+      (std.append HLArgs [HA|HRArgs] HArgs, std.split-at {std.length HLArgs} Args LArgs [_|RArgs]),
+    coq.elpi.predicate PredName {std.append HArgs [Proof]} C,
+    if (HHyps = []) (Conds0 = []) (Conds0 = [std.forall2 HHyps THyps (x\ t\ coq.typecheck x t ok)]),
     (pi ginit gfinal\
-      if (HParamsSArgs = []) (Conds1 ginit = [ginit = []|Conds0]) (
+      if (HArgs = []) (Conds1 ginit = [ginit = []|Conds0]) (
         Conds1 ginit = [
           sigma g gs\
-            coq.ltac.collect-goals (app HParamsSArgs) g gs,
+            coq.ltac.collect-goals (app HArgs) g gs,
             std.append g gs ginit|Conds0]),
-      if (K = (prod N T Body); K = (fun N T Body))
-        (KT = [KT'],
-        KBody = [KBody'],
-        Conds2 ginit = [(
-          coq.unify-eq T KT' ok,
-          @pi-decl N T a\ coq.unify-eq (Body a) (KBody' a) ok)|Conds1 ginit])
-        (Conds2 ginit = Conds1 ginit),
-      if (HParamsSArgs = []) (Conds3 ginit = Conds2 ginit) (
-        Conds3 ginit = [std.forall2 ParamsSArgs HParamsSArgs (h\ x\ coq.unify-eq h x ok)|Conds2 ginit]),
-      if (HParamsSArgs = []) (Conds4 ginit gfinal = Conds3 ginit) (
-        std.append HParamsSArgs [K|ParamsSArgs] H0,
-        std.append HArgs H0 H1,
+      (Conds2 ginit = Conds1 ginit), %TODO: cleanup
+      if (HLArgs = []) (Conds3 ginit = Conds2 ginit) (
+        Conds3 ginit = [std.forall2 LArgs HLArgs (h\ x\ coq.unify-eq h x ok)|Conds2 ginit]),
+      if (var HA) (Conds30 ginit = Conds3 ginit)
+        (Conds30 ginit = [PA|Conds3 ginit]),
+      if (HRArgs = []) (Conds31 ginit = Conds30 ginit)
+        (Conds31 ginit = [std.forall2 RArgs HRArgs (h\ x\ coq.unify-eq h x ok)|Conds30 ginit]),
+      if (HArgs = []) (Conds4 ginit gfinal = Conds31 ginit) (
+        std.append HArgs Args H0,
+        std.append HHyps H0 H1,
         Conds4 ginit gfinal = [
           ((sigma g gs\
             coq.ltac.collect-goals (app H1) g gs,
             std.append g gs gfinal),
           std.forall gfinal (g\
             mem-sealed-goal ginit g;
-            sigma gs\
-              coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g gs
-            ))|Conds3 ginit]),
+            not (goal-is-class g);
+            coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []
+            ))|Conds31 ginit]),
       std.rev (Conds4 ginit gfinal : list prop) (Conds5 ginit gfinal)),
     Clause = (pi ginit gfinal\ C :- Conds5 ginit gfinal).
-
-  func compile.subject list term, string, term, list term, list term, list term, list term, term, list term, list term -> prop.
-  compile.subject [A|SArgs] PredName ProofHd HArgs TArgs Params HParams K SArgs' HSArgs (pi a\ Clause a) :-
-    coq.typecheck A T ok,
-    @pi-decl _ T a\ compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs' [a|HSArgs] (Clause a).
-  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (let _ _ T Body) SArgs RHSArgs Clause :- !,
-    compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (Body T) SArgs RHSArgs Clause.
-  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (prod N T Body) SArgs RHSArgs (pi t a\ Clause t a) :- !,
-    coq.typecheck T TTy ok,
-    @pi-decl _ TTy t\ pi a\
-      compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams (prod N t a) [T] [Body] SArgs RHSArgs (Clause t a).
-  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams (fun N T Body) SArgs RHSArgs (pi t a\ Clause t a) :- !,
-    coq.typecheck T TTy ok,
-    @pi-decl _ TTy t\ pi a\
-      compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams (fun N t a) [T] [Body] SArgs RHSArgs (Clause t a).
-  compile.subject [] PredName ProofHd RHArgs RTArgs Params RHParams K SArgs RHSArgs Clause :-
-    compile.mk-clause [] PredName ProofHd RHArgs RTArgs Params RHParams K [] [] SArgs RHSArgs Clause.
 
   func reduce term -> term.
   reduce T R :-
@@ -194,15 +189,9 @@ namespace hb {
         not (R = T))
       (R = U).
 
-  func compile.try-join gref, list term, term -> prop, prop.
-  compile.try-join (indt TC) ParamsT K (pi x y x'\ UClause x y x') (pi x y\ JClause x y) :-
-    %Check that the current clause being built is the identity clause (T.axioms_ (T.sort _)).
-    if (K = primitive (proj P _)) (coq.projection->gref P (const PC)) (K = global (const PC)),
-    coq.env.projection-record? PC TStruct,
-    class-def (class (indt TC) (indt TStruct) _), !,
+  func compile.try-join.w-holes int, inductive, inductive, list term -> prop, prop.
+  compile.try-join.w-holes 0 TC TStruct ParamsT (pi x y x'\ UClause x y x') (pi x y\ JClause x y) :- !,
     tc.gref->pred-name (indt TC) PredName,
-
-    % Building TargetClassProjection
     get-structure-class-projection (indt TStruct) TCPC,
     if (TCPC = primitive _) (TCP = TCPC)
       (coq.mk-app TCPC ParamsT TCP),
@@ -271,31 +260,104 @@ namespace hb {
               %And we extract the class
               coq.mk-app TCP [x'] y)).
 
-  func compile.params list term, gref, string, term, list term, list term, list term, list term, term -> prop, prop, prop.
-  compile.params [P|Params] Class PredName ProofHd HArgs TArgs Ps HParams S (pi p\ Clause p) UClause JClause :-
-    coq.typecheck P T ok,
-    (@pi-decl _ T p\ compile.params Params Class PredName ProofHd HArgs TArgs Ps [p|HParams] S (Clause p) (UClause' p) (JClause' p)),
-    if (pi x\ var (UClause' x)) true ((UClause = pi x\ UClause' x), (JClause = pi x\ JClause' x)).
+  compile.try-join.w-holes N TC TStruct ParamsT (pi x\ UClause x) (pi x\ JClause x) :-
+    calc (N - 1) N',
+    pi x\ compile.try-join.w-holes N' TC TStruct [x|ParamsT] (UClause x) (JClause x).
+
+  func compile.try-join gref, list term -> prop, prop.
+  compile.try-join (indt TC) [S|RParamsT] UClause JClause :-
+    %Check that the current clause being built is the identity clause (T.axioms_ (T.sort _)).
+    coq.safe-dest-app S K _,
+    if (K = primitive (proj P _)) (coq.projection->gref P (const PC)) (K = global (const PC)),
+    coq.env.projection-record? PC TStruct,
+    class-def (class (indt TC) (indt TStruct) _), !,
+    compile.try-join.w-holes {std.length RParamsT} TC TStruct [] UClause JClause.
+
+  % [compile.largs Args PredName ProofHd HHyps THyps As HRArgs HA HLArgs Clause] abstracts over the arguments of the class
+  % we are providing an instance for, from what to left, stopping at the last argument which contains a pattern (e.g. not a local variable).
+  func compile.largs list term, gref, string, term, list term, list term, list term, list term, term, prop, list term -> prop.
+  compile.largs [A|Args] Class PredName ProofHd HHyps THyps As HRArgs HA PA HLArgs (pi p\ Clause p) :-
+    coq.typecheck A T ok,
+    (@pi-decl _ T p\ compile.largs Args Class PredName ProofHd HHyps THyps As HRArgs HA PA [p|HLArgs] (Clause p)).
     
-  compile.params [] Class PredName ProofHd HArgs TArgs Params HParams S Clause UClause JClause :-
-    coq.safe-dest-app S K SArgs,
-    if (compile.try-join Class Params K UClause JClause) true true,
-    compile.subject SArgs PredName ProofHd HArgs TArgs Params HParams K SArgs [] Clause.
+  compile.largs [] Class PredName ProofHd HHyps THyps RArgs HRArgs HA PA HLArgs Clause :-
+    compile.mk-clause Class PredName ProofHd HHyps THyps RArgs HRArgs HA PA HLArgs Clause.
 
+  pred compile.subject.hide o:any. 
+  func compile.subject.abstract.aux list term, list term, (func list term -> prop) -> prop.
+  compile.subject.abstract.aux [A|Args] H P Clause :-
+    coq.typecheck A TA ok,
+    Clause = (@pi-decl _ TA x\ Clause0 x),
+    @pi-decl _ TA x\ compile.subject.abstract.aux Args [x|H] P (Clause0 x).
+  compile.subject.abstract.aux [] H P Clause :- P {std.rev H} Clause.
+ 
+  func compile.subject.abstract list term, (func list term -> prop) -> prop.
+  compile.subject.abstract Args P Clause :-
+    compile.subject.abstract.aux Args [] P Clause.
+
+  % [compile.subject T T'] extracts the pattern [T'] out of [T]. It replaces every subterm of [T] which is not
+  % part of the pattern by a fresh hole. The holes are abstracted using pis and the output term is hidden as
+  % a prop using [compile.subject.hide]. The [compile.subject.hide _] clause comes with the clause that need to
+  % be inserted in the final output when unifying the subject.
+  func compile.subject term -> prop.
+  compile.subject (prod N T X) (pi t x\ compile.subject.hide (prod N t x), (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok)) :- !.
+  %TODO: This is incorrect, but I do not know how to abstract under a binder.
+  compile.subject (fun N T X) (pi t x\ compile.subject.hide (fun N t x), (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok)) :- !.
+  %compile.subject (fun N _ X) R :-
+  %  (pi x\ compile.subject (X x) (X' x),
+  %    std.map HX (hx\ h\ true) H',
+  %    std.forall2 HX H' (hx\h\ pi x\ hx = h x)),
+  %    std.map H' (h'\ h\ h = compile.subject.hide h') H.
+  compile.subject (sort U) (compile.subject.hide (sort U), true) :- !. 
+  compile.subject S R :-
+    coq.safe-dest-app S K Args,
+    (K = global _; K = pglobal _ _; K = primitive _), !,
+    compile.subject.abstract Args (args\ r\ sigma x\ coq.mk-app K args x, r = (compile.subject.hide x, std.forall2 Args args (x\y\ coq.unify-eq x y ok))) R.
+
+
+  func compile.args.abstract prop, list term, gref, string, term, list term, list term, list term, list term -> prop.
+  compile.args.abstract (@pi-decl N T x\ A x) Args Class PredName ProofHd HHyps THyps As HRArgs (pi x\ Clause x) :- !,
+    @pi-decl N T x\ compile.args.abstract (A x) Args Class PredName ProofHd HHyps THyps As HRArgs (Clause x).
+  compile.args.abstract (pi x\ A x) Args Class PredName ProofHd HHyps THyps As HRArgs (pi x\ Clause x) :-
+    pi x\ compile.args.abstract (A x) Args Class PredName ProofHd HHyps THyps As HRArgs (Clause x).
+  compile.args.abstract (compile.subject.hide HA, P) Args Class PredName ProofHd HHyps THyps As HRArgs Clause :-
+    compile.largs Args Class PredName ProofHd HHyps THyps As HRArgs HA P [] Clause.
+  
+  % [compile.rargs Args PredName ProofHd HHyps THyps As HArgs Clause] abstracts over the arguments of the class
+  % we are providing an instance for, from what to left, stopping at the last argument which contains a pattern (e.g. not a local variable).
+  func compile.rargs list term, gref, string, term, list term, list term, list term, list term -> prop.
+  compile.rargs [A|Args] Class PredName ProofHd HHyps THyps As HRArgs Clause :-
+    (@redflags! coq.redflags.betaiotazeta => coq.reduction.lazy.whd A A0),
+    compile.subject A0 A1, !,
+    compile.args.abstract A1 Args Class PredName ProofHd HHyps THyps As HRArgs Clause.
+
+  compile.rargs [A|Args] Class PredName ProofHd HHyps THyps As HArgs (pi p\ Clause p) :-
+    coq.typecheck A T ok,
+    (@pi-decl _ T p\ compile.rargs Args Class PredName ProofHd HHyps THyps As [p|HArgs] (Clause p)).
+    
+  compile.rargs [] Class PredName ProofHd HHyps THyps RArgs HArgs Clause :-
+    compile.mk-clause Class PredName ProofHd HHyps THyps RArgs HArgs _ _ [] Clause.
+
+  % [compile.telescope Ty ProofHd HHyps THyps Clause UClause JClause] creates fresh variables for every hypothesis of [ProofHd] (as given in
+  % its type [Ty]) and abstracts over them in the output clause [Clause] (and [UClause] and [JClause] if they are also produced).
   func compile.telescope term, term, list term, list term -> prop, prop, prop.
-  compile.telescope (prod N T B) ProofHd HArgs TArgs (pi x\ Clause x) UClause JClause :-
-    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HArgs] [T|TArgs] (Clause x) (UClause' x) (JClause' x)),
+  compile.telescope (prod N T B) ProofHd HHyps THyps (pi x\ Clause x) UClause JClause :-
+    (@pi-decl N T x\ compile.telescope (B x) ProofHd [x|HHyps] [T|THyps] (Clause x) (UClause' x) (JClause' x)),
     if (pi x\ var (UClause' x)) true ((UClause = pi x\ UClause' x), (JClause = pi x\ JClause' x)).
 
-  compile.telescope (app [(global Class)|PS]) ProofHd HArgs TArgs Clause UClause JClause :- !,
+  compile.telescope (app [(global Class)|Args]) ProofHd HHyps THyps Clause UClause JClause :- !,
     coq.TC.class? Class,
+    % Let us get the predicate name now since it can fail early
     tc.gref->pred-name Class PredName,
-    std.rev PS [S|RP],
-    std.rev RP Params,
-    compile.params Params Class PredName ProofHd HArgs TArgs Params [] S Clause UClause JClause.
+    std.rev Args RArgs,
+    if (compile.try-join Class RArgs UClause JClause) true true,
+    compile.rargs RArgs Class PredName ProofHd HHyps THyps RArgs [] Clause.
 
+  % [compile Ty ProofHd Clause UClause JClause] compiles the instance [ProofHd] of type [Ty], producing the clause [Clause].
+  % If [ProofHd] is the instance of a class on the associated structure's sort projection, it also produces the
+  % unfolding clause [UClause] and the join clause [JClause].
   func compile term, term -> prop, prop, prop.
-  compile Ty ProofHd Clause UClause JClause :-
+  compile Ty ProofHd Clause UClause JClause :- !,
     compile.telescope Ty ProofHd [] [] Clause UClause JClause.
 
   func compile.instance-gr gref -> prop, prop, prop.
@@ -303,7 +365,7 @@ namespace hb {
   compile.instance-gr InstGR (pi x\ Clause x) (pi x\ UClause x) (pi x\ JClause x) :- coq.env.univpoly? InstGR _, !,
     coq.env.typeof InstGR Ty,
     (pi x\ compile Ty (pglobal InstGR x) (Clause x) (UClause x) (JClause x)).
-  compile.instance-gr InstGR Clause UClause JClause :-
+  compile.instance-gr InstGR Clause UClause JClause :- !,
     coq.env.typeof InstGR Ty,
     compile Ty (global InstGR) Clause UClause JClause.
 }
