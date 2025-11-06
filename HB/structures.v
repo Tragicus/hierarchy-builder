@@ -136,6 +136,7 @@ namespace hb {
     class-def (class C _ _), !.
 
   pred has-compiled.
+  pred reducing.
 
   func compile.mk-clause gref, string, term, list term, list term, list term, list term, term, prop, list term -> prop.
   compile.mk-clause _Class PredName ProofHd RHHyps RTHyps RevArgs HRArgs HA PA HLArgs Clause :-
@@ -166,7 +167,7 @@ namespace hb {
           ((sigma g gs\
             coq.ltac.collect-goals (app H1) g gs,
             std.append g gs gfinal),
-          std.forall gfinal (g\
+            (reducing :- !, fail) => std.forall gfinal (g\
             mem-sealed-goal ginit g;
             not (goal-is-class g);
             coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []
@@ -176,6 +177,7 @@ namespace hb {
 
   func reduce term -> term.
   reduce T R :-
+    not (var T),
 		coq.reduction.whd-betaiota-deltazeta-for-iota-state T U,
     if (T = U)
       (coq.safe-dest-app U Hd Args,
@@ -189,20 +191,29 @@ namespace hb {
         not (R = T))
       (R = U).
 
+  func reduce-loop string, list term, term, term, list term ->.
+  reduce-loop PredName LArgs Ainit A RArgs :-
+    not reducing,
+    if (reduce A A0)
+      (if (coq.elpi.predicate PredName {std.append LArgs [A0|RArgs]} G, reducing => G) true
+        (reduce-loop PredName LArgs Ainit A0 RArgs))
+      (std.rev LArgs [A1|RLArgs],
+        std.rev RLArgs LArgs0,
+        reduce-loop PredName LArgs0 A1 A1 [Ainit|RArgs]).
+    
+
   func compile.try-join.w-holes int, inductive, inductive, list term -> prop, prop.
-  compile.try-join.w-holes 0 TC TStruct ParamsT (pi x y x'\ UClause x y x') (pi x y\ JClause x y) :- !,
+  compile.try-join.w-holes 0 TC TStruct ParamsT (pi x y\ UClause x y) (pi x y\ JClause x y) :- !,
     tc.gref->pred-name (indt TC) PredName,
     get-structure-class-projection (indt TStruct) TCPC,
     if (TCPC = primitive _) (TCP = TCPC)
       (coq.mk-app TCPC ParamsT TCP),
 
     % Build unfolding and join clauses
-    pi x y x'\ sigma args args' c c'\
+    pi x y\ sigma args args' c\
 			std.append ParamsT [x, y] args,
 			coq.elpi.predicate PredName args c,
-			std.append ParamsT [x', y] args',
-			coq.elpi.predicate PredName args' c',
-			UClause x y x' = (c :- !, reduce x x', c'),
+      UClause x y = (c :- !, reduce-loop PredName ParamsT x x [y]),
       JClause x y =
         (pi kargs k p pc pn s m sc jc nargs subject revkparams kparams coe revkparams kparams\ c :-
           %Check that the subject is a projection...
@@ -283,7 +294,7 @@ namespace hb {
   compile.largs [] Class PredName ProofHd HHyps THyps RArgs HRArgs HA PA HLArgs Clause :-
     compile.mk-clause Class PredName ProofHd HHyps THyps RArgs HRArgs HA PA HLArgs Clause.
 
-  pred compile.subject.hide o:any. 
+  pred compile.subject.hide o:term, o:prop. 
   func compile.subject.abstract.aux list term, list term, (func list term -> prop) -> prop.
   compile.subject.abstract.aux [A|Args] H P Clause :-
     coq.typecheck A TA ok,
@@ -296,23 +307,23 @@ namespace hb {
     compile.subject.abstract.aux Args [] P Clause.
 
   % [compile.subject T T'] extracts the pattern [T'] out of [T]. It replaces every subterm of [T] which is not
-  % part of the pattern by a fresh hole. The holes are abstracted using pis and the output term is hidden as
-  % a prop using [compile.subject.hide]. The [compile.subject.hide _] clause comes with the clause that need to
-  % be inserted in the final output when unifying the subject.
+  % part of the pattern by a fresh hole. The holes are abstracted using pis and the output term [X] is hidden as
+  % a prop using [T' = compile.subject.hide X P], with [P] the clause that need to be inserted in the final output
+  % when unifying the subject.
   func compile.subject term -> prop.
-  compile.subject (prod N T X) (pi t x\ compile.subject.hide (prod N t x), (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok)) :- !.
+  compile.subject (prod N T X) (pi t x\ compile.subject.hide (prod N t x) (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok)) :- !.
   %TODO: This is incorrect, but I do not know how to abstract under a binder.
-  compile.subject (fun N T X) (pi t x\ compile.subject.hide (fun N t x), (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok)) :- !.
+  compile.subject (fun N T X) (pi t x\ compile.subject.hide (fun N t x) (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok)) :- !.
   %compile.subject (fun N _ X) R :-
   %  (pi x\ compile.subject (X x) (X' x),
   %    std.map HX (hx\ h\ true) H',
   %    std.forall2 HX H' (hx\h\ pi x\ hx = h x)),
   %    std.map H' (h'\ h\ h = compile.subject.hide h') H.
-  compile.subject (sort U) (compile.subject.hide (sort U), true) :- !. 
+  compile.subject (sort U) (compile.subject.hide (sort U) true) :- !. 
   compile.subject S R :-
     coq.safe-dest-app S K Args,
     (K = global _; K = pglobal _ _; K = primitive _), !,
-    compile.subject.abstract Args (args\ r\ sigma x\ coq.mk-app K args x, r = (compile.subject.hide x, std.forall2 Args args (x\y\ coq.unify-eq x y ok))) R.
+    compile.subject.abstract Args (args\ r\ sigma x\ coq.mk-app K args x, r = compile.subject.hide x (std.forall2 Args args (x\y\ coq.unify-eq x y ok))) R.
 
 
   func compile.args.abstract prop, list term, gref, string, term, list term, list term, list term, list term -> prop.
@@ -320,7 +331,7 @@ namespace hb {
     @pi-decl N T x\ compile.args.abstract (A x) Args Class PredName ProofHd HHyps THyps As HRArgs (Clause x).
   compile.args.abstract (pi x\ A x) Args Class PredName ProofHd HHyps THyps As HRArgs (pi x\ Clause x) :-
     pi x\ compile.args.abstract (A x) Args Class PredName ProofHd HHyps THyps As HRArgs (Clause x).
-  compile.args.abstract (compile.subject.hide HA, P) Args Class PredName ProofHd HHyps THyps As HRArgs Clause :-
+  compile.args.abstract (compile.subject.hide HA P) Args Class PredName ProofHd HHyps THyps As HRArgs Clause :-
     compile.largs Args Class PredName ProofHd HHyps THyps As HRArgs HA P [] Clause.
   
   % [compile.rargs Args PredName ProofHd HHyps THyps As HArgs Clause] abstracts over the arguments of the class
