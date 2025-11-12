@@ -231,7 +231,7 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
   std.map SCGs (scg\g\ scg = pr _ (pr _ g)) Gs3,
   coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs3 _,
 	if-verbose (coq.say {header} "KCApp " {coq.term->string KCApp''}),
-  coq.elaborate-skeleton KCApp'' _ KCApp ok,
+  ((coq.typecheck KCApp'' _ ok, KCApp = KCApp''); coq.elaborate-skeleton KCApp'' _ KCApp ok),
 	if-verbose (coq.say {header} "we can build a" {nice-gref->string Struct} "on"
 		{coq.term->string T}),
 
