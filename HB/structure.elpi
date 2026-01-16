@@ -139,7 +139,9 @@ declare Module BSkel Sort :- std.do! [
     (if-arg-sort (private.declare-sort-coercion CoeClass Structure (global (const ArgSortCst))),
     private.declare-sort-coercion CoeClass Structure SortProjection),
 
-  private.declare-generic-coercion-elpi Structure,
+  if (var CoeClass; CoeClass = funclass)
+    (private.declare-generic-coercion-elpi Structure)
+    true,
 
   if-verbose (coq.say {header} "exporting unification hints"),
   ClassAlias => Factories => GRDepsClauses =>
