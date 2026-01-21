@@ -22,7 +22,7 @@ Definition ignore_disabled {T T'} (x : T) (x' : T') := x'.
 
 (* ********************* structures ****************************** *)
 Set Primitive Projections.
-From elpi Require Import elpi coercion tc.
+From elpi Require Import elpi coercion tc cs.
 
 From elpi.apps.tc.elpi Extra Dependency "tc_aux.elpi" as tc_aux.
 
@@ -1015,6 +1015,7 @@ HB.structure Definition StructureName params :=
 #[arguments(raw)] Elpi Command HB.structure.
 Elpi Accumulate Db coercion.db.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate Db cs.db.
 Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
