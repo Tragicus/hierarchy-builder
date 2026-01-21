@@ -97,45 +97,49 @@ not-subclass-of HasNoInstance (class C _ _) :- not(sub-class C HasNoInstance _ _
 % rest. For each fulfilled class it declares a local constant inhabiting the
 % corresponding structure and declares it canonical.
 % Each mixin used in order to fulfill a class is returned together with its name.
-func declare-all term, list hbclass -> list (pair id constant).
-declare-all _ [] [].
-declare-all T [class _ Struct _|Rest] L :- has-instance T Struct, !,
-  declare-all T Rest L.
-declare-all T [class Class Struct MLwP|Rest] [pr Name CS|L] :-
-  infer-class T Class Struct MLwP S Name STy Clauses, !,
-  decl-const-in-struct T Class Name S STy CS,
-  Clauses => declare-all T Rest L.
+func declare-all term, list class -> list (pair id constant), list prop.
+declare-all _ [] [] [].
+declare-all T [class _ Struct _|Rest] L CL :- has-instance T Struct, !,
+  declare-all T Rest L CL.
+declare-all T [class Class Struct MLwP|Rest] [pr Name CS, pr Name' CS'|L] [Clause|CL] :-
+  infer-class T Class Struct MLwP S Name STy SCS Clauses, !,
+  decl-const-in-struct T Class Name S STy SCS [CS, CS'] Clause,
+  calc (Name ^ "_cs") Name',
+  Clauses => declare-all T Rest L CL.
 
-declare-all T [class HasNoInstance _ _|Rest] L :-
+declare-all T [class HasNoInstance _ _|Rest] L CL :-
   % filter out classes we can't build for sure
   std.filter Rest (not-subclass-of HasNoInstance) Rest1,
-  declare-all T Rest1 L.
+  declare-all T Rest1 L CL.
 
 % for generic types, we need first to instantiate them by giving them holes,
 % so they can be used to instantiate the classes
 :index (_ 2)
-func declare-all-on-type-constructor term, list hbclass -> list (pair id constant).
-declare-all-on-type-constructor _ [] [].
-declare-all-on-type-constructor TK [class _ Struct _|Rest] L :- saturate-type-constructor TK T, has-instance T Struct, !,
-  declare-all-on-type-constructor TK Rest L.
-declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS|L] :-
+func declare-all-on-type-constructor term, list class -> list (pair id constant), list prop.
+declare-all-on-type-constructor _ [] [] [].
+declare-all-on-type-constructor TK [class _ Struct _|Rest] L CL :- saturate-type-constructor TK T, has-instance T Struct, !,
+  declare-all-on-type-constructor TK Rest L CL.
+declare-all-on-type-constructor TK [class Class Struct MLwP|Rest] [pr Name CS, pr Name' CS'|L] [Clause|CL] :-
 
   %TODO: compute the arity of the Class subject and saturate up to that point
   %      there may even be more than one possibility
   saturate-type-constructor TK T,
-  infer-class T Class Struct MLwP S Name _STy Clauses, !,
+  infer-class T Class Struct MLwP S Name _STy SCS Clauses, !,
 
   abstract-holes.main S SC,
   std.assert-ok! (coq.typecheck SC SCTy) "declare-all-on-type-constructor: badly closed",
+
+  abstract-holes.main SCS SCS',
   
-  decl-const-in-struct T Class Name SC SCTy CS,
+  decl-const-in-struct T Class Name SC SCTy SCS' [CS, CS'] Clause,
+  calc (Name ^ "_cs") Name',
 
-  Clauses => declare-all-on-type-constructor TK Rest L.
+  Clauses => declare-all-on-type-constructor TK Rest L CL.
 
-declare-all-on-type-constructor TK [class HasNoInstance _ _|Rest] L :-
+declare-all-on-type-constructor TK [class HasNoInstance _ _|Rest] L CL :-
   % filter out classes we can't build for sure
   std.filter Rest (not-subclass-of HasNoInstance) Rest1,
-  declare-all-on-type-constructor TK Rest1 L.
+  declare-all-on-type-constructor TK Rest1 L CL.
 
 func has-instance term, structure ->.
 has-instance T Struct :-
@@ -209,8 +213,8 @@ rev-sort-windex [C|Cs] Gs R :-
 % - T the subject
 % - Class, Struct and MLwP the class's gref, associated structure and mixin contents.
 % produces an instance S of Class on the subject T with type STy and generated name Name. For every mixin which has no declared associated gref, it declares a new gref and a clause for `mixin-mem`.
-func infer-class term, classname, gref, factories -> term, string, term, list prop.
-infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
+func infer-class term, classname, gref, factories -> term, string, term, term, list prop.
+infer-class T Class Struct MLwP S Name STy SCS Clauses :- std.do![
 
   params->holes MLwP Params,
   get-constructor Class KC,
@@ -244,6 +248,9 @@ infer-class T Class Struct MLwP S Name STy Clauses :- std.do![
   private.optimize-class-body THD {std.length Params} KCApp S Clauses,
   if-verbose (coq.say {header} "structure instance for" Name "is" {coq.term->string S}),
 
+  get-constructor Struct KS,
+  coq.mk-app (global KS) {std.append Params [T, S]} SCS,
+
   coq.typecheck S STy Diag,
   if (Diag = ok) true (
     if-verbose (coq.say {header} "typechecking fails, the parameters may not be rich enough"),
@@ -256,19 +263,24 @@ func ty->class term -> term.
 ty->class (prod _ _ T) C :- !, pi x\ ty->class (T x) C.
 ty->class T C :- coq.safe-dest-app T C _.
 
-func decl-const-in-struct term, gref, string, term, term, constant ->.
-decl-const-in-struct T _Class Name S STy CS:- std.do![
-  if (ground_term S) (S1 = S, STy1 = STy)
+func decl-const-in-struct term, gref, string, term, term, term -> list constant, prop.
+decl-const-in-struct T _Class Name S STy SCS [CS, CS'] Clause :- std.do![
+  if (ground_term S) (S1 = S, STy1 = STy, SCS1 = SCS)
     (abstract-holes.main S S1,
-     std.assert-ok! (coq.typecheck S1 STy1) "HB: structure instance illtyped after generalizing over holes"),
+     std.assert-ok! (coq.typecheck S1 STy1) "HB: structure instance illtyped after generalizing over holes",
+     abstract-holes.main SCS SCS1),
+  coq.typecheck SCS1 SCSTy1 ok,
 
   log.coq.env.add-const-noimplicits Name S1 STy1 @transparent! CS, % Bug coq/coq#11155, could be a Let
   %TODO: compute the right priority
   coq.TC.declare-instance (const CS) 1, % Bug coq/coq#11155, should be local
+  log.coq.env.add-const-noimplicits {calc (Name ^ "_cs")} SCS1 SCSTy1 @transparent! CS', % Bug coq/coq#11155, could be a Let
+  with-locality (log.coq.CS.declare-instance CS'),
 	ty->class STy1 (global Hd),
 	term->cs-pattern T Pat,
 	class-def (class Hd Struct _),
-	coq.elpi.accumulate _ "tc.db" (clause _ _ (has-canonical-structure-on Pat Struct)),
+  Clause = has-canonical-structure-on Pat Struct,
+	coq.elpi.accumulate _ "tc.db" (clause _ _ Clause),
   acc-clause current (local-canonical CS),
   Struct = indt SInd,
   coq.env.indt SInd _ NParams _ _ _ _,
@@ -332,7 +344,7 @@ mk-factory-sort-deps AliasGR CSL :- std.do! [
     KFSortMSL,
   KFSortMSL =>
     synthesis.under-mixin-src-from-factory.do! KFSort GCF
-      [declare-all KFSort {findall-classes-for ML} CSL]
+      [declare-all KFSort {findall-classes-for ML} CSL _]
 ].
 
 func mk-factory-sort-factory gref -> list (pair id constant), list (pair id constant).
@@ -372,7 +384,7 @@ saturate-instances Filter :- std.do! [
     if-verbose (coq.say {header} "saturating key" k),
     std.filter AllClasses (no-instance-for k) Classes,
     if-verbose (coq.say {header} {std.length Classes} "instances to declare"),
-    declare-all-on-type-constructor t Classes _),
+    declare-all-on-type-constructor t Classes _ _),
 ].
 
 func no-instance-for cs-pattern, class ->.
@@ -396,17 +408,13 @@ declare-instance Factory T F Clauses CFL CSL :-
   declare-canonical-instances-from-factory-and-local-builders Factory
     T F TheFactory FGR Clauses CFL CSL.
 declare-instance Factory T F Clauses CFL CSL :-
-  declare-canonical-instances-from-factory Factory T F Clauses1 CFL CSL,
-  clauses-for-export {std.append CFL CSL} Clauses2,
-  std.append Clauses1 Clauses2 Clauses.
-
-func clauses-for-export list (pair id constant) -> list prop.
-clauses-for-export CL ECL :-
-   if (get-option "export" tt)
+  declare-canonical-instances-from-factory Factory T F Clauses1 CFL CSL CL,
+  if (get-option "export" tt)
      (coq.env.current-library File,
       std.map CFL (x\r\ sigma i c\ x = pr i c, r = mixin-to-export File i c) Clauses3,
       std.map CSL (x\r\ sigma i c\ x = pr i c, r = instance-to-export File i c) Clauses4,
-      std.append Clauses3 Clauses4 Clauses2)
+      std.map CL (x\r\ r = clause-to-export File x) Clauses5,
+      std.flatten [Clauses3, Clauses4, Clauses5] Clauses2)
      (Clauses2 = []),
    std.append Clauses1 Clauses2 Clauses.
 
@@ -481,15 +489,15 @@ declare-canonical-instances-from-factory-and-local-builders
       add-all-mixins T FGR NewMixins ff Clauses CFL,
   ]),
   list-w-params_list {factory-provides Factory} ML,
-  Clauses => declare-all T {findall-classes-for ML} CSL,
+  Clauses => declare-all T {findall-classes-for ML} CSL _,
 ].
 
 % [declare-canonical-instances-from-factory T F] given a factory F
 % it uses all known builders to declare canonical instances of structures
 % on T
 func declare-canonical-instances-from-factory
-  factoryname, term, term -> list prop, list (pair id constant), list (pair id constant).
-declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.do! [
+  factoryname, term, term -> list prop, list (pair id constant), list (pair id constant), list prop.
+declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL CL :- std.do! [
   % The order of the following two "under...do!"  is crucial,
   % priority must be given to canonical mixins
   % as they are the ones which guarantee forgetful inheritance
@@ -500,7 +508,7 @@ declare-canonical-instances-from-factory Factory T F ClausesHas CFL CSL :- std.d
       list-w-params_list {factory-provides Factory} ML,
       add-all-mixins T Factory ML tt Clauses CFL,
       std.map-filter Clauses (mixin-src->has-mixin-instance ) ClausesHas,
-      ClausesHas => declare-all T {findall-classes-for ML} CSL, % declare-all-on-type-constructor doesn't work here
+      ClausesHas => declare-all T {findall-classes-for ML} CSL CL, % declare-all-on-type-constructor doesn't work here
     ]
   ],
 ].

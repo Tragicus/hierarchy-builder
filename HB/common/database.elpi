@@ -51,7 +51,17 @@ func module-to-export_module-nice prop -> id.
 module-to-export_module-nice (module-to-export _ M _) M.
 
 func instance-to-export_instance prop -> constant.
-instance-to-export_instance (instance-to-export _ _ M) M.
+instance-to-export_instance (instance-to-export _ N M) M :-
+  calc (size N) I,
+  calc (I - 3) J,
+  not (calc (substring N J 3) "_cs").
+
+func instance-to-export_cs prop -> constant.
+instance-to-export_cs (instance-to-export _ N M) M :-
+  calc (size N) I,
+  calc (I - 3) J,
+  calc (substring N J 3) "_cs".
+
 
 func instance-to-export_instance-nice prop -> id.
 instance-to-export_instance-nice (instance-to-export _ M _) M.

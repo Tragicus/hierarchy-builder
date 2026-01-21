@@ -67,10 +67,6 @@ declare Module BSkel Sort :- std.do! [
   log.coq.env.add-const-noimplicits "pack_" Pack _ @transparent! ConstPack,
   GRPack = const ConstPack,
 
-	(class-def CurrentClass => w-params.then MLwP mk-fun mk-fun (private.packS-body ClassName) PackS),
-  if-verbose (coq.say {header} "declaring Pack_ constant =" PackS),
-       log.coq.env.add-const-noimplicits "Pack_" PackS _ @transparent! ConstPackS,
-
   if-arg-sort (
     if-verbose (coq.say {header} "define arg_sort"),
     std.assert-ok! (coq.typecheck SortProjection SortProjTy)
@@ -95,8 +91,10 @@ declare Module BSkel Sort :- std.do! [
     NewClauses,
   acc-clauses current NewClauses,
 
+  w-params.nparams MLwP NParams,
+
   if-verbose (coq.say {header} "declaring constructor as canonical" ConstPack),
-    with-locality (log.coq.CS.declare-instance ConstPackS), 
+  class-def CurrentClass => (private.sort-cs-catch-all ClassName NParams, private.class-cs-catch-all ClassName NParams),
 
 	coq.hints.add-mode ClassName "typeclass_instances" {std.append {std.list.make {w-params.nparams MLwP} mode-input} [mode-input]},
 	coq.TC.declare-class ClassName,
@@ -741,6 +739,71 @@ pack-body.aux PL T BuildC PackS  Body :- !, std.do! [
   synthesis.infer-all-gref->deps PL T BuildC Class,
   mk-app (global PackS) {std.append PL [T, Class]} Body
 ].
+
+% [sort-cs-catch-all ClassName] declares a generic canonical
+%  structure for the sort projection on the structure on class ClassName,
+%  deferring the instanciation of the class field to typeclass resolution.
+pred sort-cs-catch-all i:classname, i:int.
+sort-cs-catch-all ClassName NParams :- std.do! [
+  class-def (class ClassName S _),
+  get-constructor S PackS,
+  get-structure-sort-projection S Ssort',
+  if (Ssort' = primitive (proj ProjPP _))
+   (coq.env.primitive-projection? ProjPP ProjPC _, Ssort = global (const ProjPC))
+   (Ssort = Ssort'),
+  if (calc NParams 0)
+    ((pi ctx rhs res\ 
+        coq.elpi.predicate "cs" [ctx, Ssort, rhs, res] (CS0 ctx rhs res)),
+    coq.elpi.accumulate _ "cs.db" (clause _ _ (
+      pi ctx rhs res res' cl ty g rem\
+      CS0 ctx rhs res :- std.do![
+        mk-app (global PackS) [rhs, cl] res',
+        coq.typecheck res' (global S) ok,
+        coq.ltac.collect-goals cl [g] [],
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem,
+        res = res'])))
+    ((pi ctx params rhs res\ coq.elpi.predicate "cs" [ctx, (app [Ssort|params]), rhs, res] (CS ctx params rhs res)),
+    coq.elpi.accumulate _ "cs.db" (clause _ _ (
+      pi ctx rhs res res' params paramsx cl ty g rem\
+      CS ctx params rhs res :- std.do![
+        std.append params [rhs, cl] paramsx,
+        mk-app (global PackS) paramsx res',
+        mk-app (global S) params ty,
+        coq.typecheck res' ty ok,
+        coq.ltac.collect-goals cl [g] [],
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem,
+        res = res'])))].
+
+% [class-cs-catch-all ClassName] declares a generic canonical
+%  structure for the class projection on the structure on class ClassName,
+%  deferring the instanciation of the sort field to the elaborator.
+pred class-cs-catch-all i:classname, i:int.
+class-cs-catch-all ClassName NParams :- std.do! [
+  class-def (class ClassName S _),
+  get-constructor S PackS,
+  get-structure-class-projection S Sclass',
+  if (Sclass' = primitive (proj ProjPP _))
+   (coq.env.primitive-projection? ProjPP ProjPC _, Sclass = global (const ProjPC))
+   (Sclass = Sclass'),
+  if (calc NParams 0)
+    ((pi ctx rhs res\ 
+        coq.elpi.predicate "cs" [ctx, Sclass, rhs, res] (CS0 ctx rhs res)),
+    coq.elpi.accumulate _ "cs.db" (clause _ _ (
+      pi ctx lhs rhs res params args argsc ty\
+      CS0 ctx rhs res :-
+        coq.typecheck rhs ty ok,
+        coq.safe-dest-app ty (global ClassName) args,
+        std.append args [rhs] argsc,
+        mk-app (global PackS) argsc res)))
+    ((pi ctx params rhs res\ coq.elpi.predicate "cs" [ctx, (app [Sclass|params]), rhs, res] (CS ctx params rhs res)),
+    coq.elpi.accumulate _ "cs.db" (clause _ _ (
+      pi ctx rhs res params args argsc ty\
+      CS ctx params rhs res :-
+        coq.typecheck rhs ty ok,
+        coq.safe-dest-app ty (global ClassName) args,
+        std.append args [rhs] argsc,
+        mk-app (global PackS) argsc res)))
+  ].
 
 % [packS-body Structure P T MLwA B] asserts
 %  B = fun c => Pack P T (Class P T c)
