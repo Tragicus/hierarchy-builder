@@ -76,6 +76,10 @@ Global Open Scope HB_scope.
 
 (* Hacking the tc solver's instance compilation clause. *)
 Elpi Accumulate tc.db lp:{{
+% copy of the cs predicate in tc.db used to transfer clauses during export.
+:index (0 6 6)
+pred cs i:goal-ctx, i:term, i:term, o:term.
+
 func w-holes.aux int, (list term -> prop -> prop), list term -> prop.
 w-holes.aux 0 P L R :- !, P L R, !.
 w-holes.aux N P L (pi x\ R x) :- pi x\ w-holes.aux {calc (N - 1)} P [x|L] (R x).
@@ -133,10 +137,11 @@ namespace hb {
     not (var GC),
     GC = global C,
     not (var C),
-    class-def (class C _ _), !.
+    coq.TC.class? C, !.
 
   pred has-compiled.
   pred reducing.
+  pred subgoal.
 
   func compile.mk-clause gref, string, term, list term, list term, list term, list term, term, prop, list term -> prop.
   compile.mk-clause _Class PredName ProofHd RHHyps RTHyps RevArgs HRArgs HA PA HLArgs Clause :-
@@ -167,7 +172,7 @@ namespace hb {
           ((sigma g gs\
             coq.ltac.collect-goals (app H1) g gs,
             std.append g gs gfinal),
-            (reducing :- !, fail) => std.forall gfinal (g\
+            [(reducing :- !, fail), subgoal] => std.forall gfinal (g\
             mem-sealed-goal ginit g;
             not (goal-is-class g);
             coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []
@@ -191,6 +196,8 @@ namespace hb {
         not (R = T))
       (R = U).
 
+  % Reduction loop, we reduce arguments of the typeclass from right to left.
+  % We do not allow reduction in recursive calls, as they would not know which argument to reduce next or how to refold reduced arguments.
   func reduce-loop string, list term, term, term, list term ->.
   reduce-loop PredName LArgs Ainit A RArgs :-
     not reducing,
@@ -202,13 +209,35 @@ namespace hb {
         reduce-loop PredName LArgs0 A1 A1 [Ainit|RArgs]).
     
 
-  func compile.try-join.w-holes int, inductive, inductive, list term -> prop, prop.
-  compile.try-join.w-holes 0 TC TStruct ParamsT (pi x y\ UClause x y) (pi x y\ JClause x y) :- !,
+  func compile.try-join.w-holes int, inductive, inductive, list term -> prop, prop, prop.
+  compile.try-join.w-holes 0 TC TStruct ParamsT (pi x y\ UClause x y) (pi x y\ JClause x y) (pi x y\ Clause x y) :- !,
     tc.gref->pred-name (indt TC) PredName,
+    get-structure-sort-projection (indt TStruct) TSPC,
     get-structure-class-projection (indt TStruct) TCPC,
     if (TCPC = primitive _) (TCP = TCPC)
       (coq.mk-app TCPC ParamsT TCP),
 
+    (pi x y\ sigma args c\
+			std.append ParamsT [app [TSPC|x], y] args,
+			coq.elpi.predicate PredName args c,
+      if (TSPC = primitive _)
+        (Clause x y = (pi params s sty tc\ c :-
+          % If we are in a subgoal, we HAVE TO succeed since no one will catch a failure. This may cause the below mentioned loop to trigger once, but on its next run we will not be in a subgoal.
+          % If we are not in a subgoal and are reducing, we MUST NOT succeed, otherwise typechecking will unify the
+          % `S.axioms_ t` with `S.axioms_ (S.sort s)` with `S.axioms_ t` the initial goal and
+          % `S.axioms_ (S.sort s)` the current goal, leading to an infinite loop.
+          (subgoal; not reducing),
+          x = [s],
+          coq.typecheck s sty ok,
+          coq.safe-dest-app sty tc params,
+          std.forall2 params ParamsT (h\ x\ coq.unify-eq h x ok),
+          y = app [TCPC|x]))
+        (Clause x y = (pi rparams params s\ c :-
+          (subgoal; not reducing),
+          std.rev x [s|rparams],
+          std.rev rparams params,
+          std.forall2 params ParamsT (h\ x\ coq.unify-eq h x ok),
+          y = app [TCPC|x]))),
     % Build unfolding and join clauses
     pi x y\ sigma args args' c\
 			std.append ParamsT [x, y] args,
@@ -216,6 +245,7 @@ namespace hb {
       UClause x y = (c :- !, reduce-loop PredName ParamsT x x [y]),
       JClause x y =
         (pi kargs k p pc pn s m sc jc nargs subject revkparams kparams coe revkparams kparams\ c :-
+          (subgoal; not reducing),
           %Check that the subject is a projection...
           coq.safe-dest-app x k kargs,
           not (var k),
@@ -271,18 +301,25 @@ namespace hb {
               %And we extract the class
               coq.mk-app TCP [x'] y)).
 
-  compile.try-join.w-holes N TC TStruct ParamsT (pi x\ UClause x) (pi x\ JClause x) :-
+  compile.try-join.w-holes N TC TStruct ParamsT (pi x\ UClause x) (pi x\ JClause x) (pi x\ Clause x) :-
     calc (N - 1) N',
-    pi x\ compile.try-join.w-holes N' TC TStruct [x|ParamsT] (UClause x) (JClause x).
+    pi x\ compile.try-join.w-holes N' TC TStruct [x|ParamsT] (UClause x) (JClause x) (Clause x).
 
-  func compile.try-join gref, list term -> prop, prop.
-  compile.try-join (indt TC) [S|RParamsT] UClause JClause :-
+  func compile.try-join gref, list term -> prop, prop, prop.
+  compile.try-join (indt TC) [S|RParamsT] UClause JClause Clause :-
     %Check that the current clause being built is the identity clause (T.axioms_ (T.sort _)).
-    coq.safe-dest-app S K _,
-    if (K = primitive (proj P _)) (coq.projection->gref P (const PC)) (K = global (const PC)),
+    coq.safe-dest-app S K SArgs,
+    if (K = primitive (proj P _))
+      (coq.projection->gref P (const PC),
+        SArgs = [X],
+        coq.typecheck X XTy ok,
+        coq.safe-dest-app XTy _ XParams,
+        std.rev RParamsT XParams)
+      (K = global (const PC),
+        std.rev SArgs [_|RParamsT]),
     coq.env.projection-record? PC TStruct,
     class-def (class (indt TC) (indt TStruct) _), !,
-    compile.try-join.w-holes {std.length RParamsT} TC TStruct [] UClause JClause.
+    compile.try-join.w-holes {std.length RParamsT} TC TStruct [] UClause JClause Clause.
 
   % [compile.largs Args PredName ProofHd HHyps THyps As HRArgs HA HLArgs Clause] abstracts over the arguments of the class
   % we are providing an instance for, from what to left, stopping at the last argument which contains a pattern (e.g. not a local variable).
@@ -361,8 +398,8 @@ namespace hb {
     % Let us get the predicate name now since it can fail early
     tc.gref->pred-name Class PredName,
     std.rev Args RArgs,
-    if (compile.try-join Class RArgs UClause JClause) true true,
-    compile.rargs RArgs Class PredName ProofHd HHyps THyps RArgs [] Clause.
+    (compile.try-join Class RArgs UClause JClause Clause;
+      compile.rargs RArgs Class PredName ProofHd HHyps THyps RArgs [] Clause), !.
 
   % [compile Ty ProofHd Clause UClause JClause] compiles the instance [ProofHd] of type [Ty], producing the clause [Clause].
   % If [ProofHd] is the instance of a class on the associated structure's sort projection, it also produces the
@@ -616,7 +653,7 @@ pred module-to-export   o:string, o:id, o:modpath.
 pred instance-to-export o:string, o:id, o:constant.
 pred mixin-to-export o:string, o:id, o:constant.
 pred abbrev-to-export   o:string, o:id, o:gref.
-pred clause-to-export   o:string, o:prop.
+pred clause-to-export   o:string, o:string, o:prop.
 
 %% database for HB.locate and HB.about %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
