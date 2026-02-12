@@ -281,7 +281,7 @@ decl-const-in-struct T _Class Name S STy SCS [CS, CS'] Clause :- std.do![
 	class-def (class Hd Struct _),
   Clause = has-canonical-structure-on Pat Struct,
 	coq.elpi.accumulate _ "tc.db" (clause _ _ Clause),
-  acc-clause current (local-canonical CS),
+  acc-clause current (local-canonical CS'),
   Struct = indt SInd,
   coq.env.indt SInd _ NParams _ _ _ _,
   coq.env.projections SInd [some SortP, _],
@@ -413,7 +413,7 @@ declare-instance Factory T F Clauses CFL CSL :-
      (coq.env.current-library File,
       std.map CFL (x\r\ sigma i c\ x = pr i c, r = mixin-to-export File i c) Clauses3,
       std.map CSL (x\r\ sigma i c\ x = pr i c, r = instance-to-export File i c) Clauses4,
-      std.map CL (x\r\ r = clause-to-export File x) Clauses5,
+      std.map CL (x\r\ r = clause-to-export File "tc.db" x) Clauses5,
       std.flatten [Clauses3, Clauses4, Clauses5] Clauses2)
      (Clauses2 = []),
    std.append Clauses1 Clauses2 Clauses.

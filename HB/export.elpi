@@ -29,7 +29,7 @@ export.abbrev NiceName GR :- !,
 func export.clause prop ->.
 export.clause Clause :- !,
   coq.env.current-library File,
-  acc-clauses current [Clause, clause-to-export File Clause].
+  acc-clauses current [Clause, clause-to-export File "tc.db" Clause].
 
 func export.reexport-all-modules-and-CS option string ->.
 export.reexport-all-modules-and-CS Filter :- std.do! [
@@ -74,11 +74,9 @@ export.reexport-all-modules-and-CS Filter :- std.do! [
   if-verbose (coq.say {header} "exporting Abbreviations" AbbNames),
   std.forall2 AbbNames AbbBodies (n\b\@global! => log.coq.notation.add-abbreviation n 0 b ff _),
 
-  std.findall (clause-to-export File Clause_) ClausesL,
-  if-verbose (coq.say {header} "exporting Clauses" Clauses),
-  std.map ClausesL clause-to-export_clause Clauses,
-  acc-clauses current Clauses
-
+  std.findall (clause-to-export File _ Clause_) ClausesL,
+  if-verbose (coq.say {header} "exporting Clauses" ClausesL),
+  std.forall ClausesL (x\ sigma f d c\ x = clause-to-export f d c, coq.elpi.accumulate current d (clause _ _ c))
 ].
 
 

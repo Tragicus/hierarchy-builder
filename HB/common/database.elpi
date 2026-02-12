@@ -78,7 +78,7 @@ func abbrev-to-export_body prop -> term.
 abbrev-to-export_body (abbrev-to-export _ _ B) (global B).
 
 func clause-to-export_clause prop -> prop.
-clause-to-export_clause (clause-to-export _ C) C.
+clause-to-export_clause (clause-to-export _ _ C) C.
 
 func extract-builder prop -> builder.
 extract-builder (builder-decl B) B.
