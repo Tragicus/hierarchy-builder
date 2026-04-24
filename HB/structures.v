@@ -152,19 +152,19 @@ namespace hb {
     if (var HA) (HArgs = HRArgs, RArgs = Args)
       (std.append HLArgs [HA|HRArgs] HArgs, std.split-at {std.length HLArgs} Args LArgs [_|RArgs]),
     coq.elpi.predicate PredName {std.append HArgs [Proof]} C,
-    if (HHyps = []) (Conds0 = []) (Conds0 = [std.forall2 HHyps THyps (x\ t\ coq.typecheck x t ok)]),
+    if (HHyps = []) (Conds0 = []) (Conds0 = [std.forall2 HHyps THyps (x\ t\ coq.typecheck x t ok)]), !,
     (pi ginit gfinal\
       if (HArgs = []) (Conds1 ginit = [ginit = []|Conds0]) (
         Conds1 ginit = [
           sigma g gs\
             coq.ltac.collect-goals (app HArgs) g gs,
-            std.append g gs ginit|Conds0]),
+            std.append g gs ginit|Conds0]), !,
       if (HLArgs = []) (Conds2 ginit = Conds1 ginit) (
-        Conds2 ginit = [std.forall2 LArgs HLArgs (h\ x\ coq.unify-eq h x ok)|Conds1 ginit]),
+        Conds2 ginit = [std.forall2 LArgs HLArgs (h\ x\ coq.unify-eq h x ok)|Conds1 ginit]), !,
       if (var HA) (Conds3 ginit = Conds2 ginit)
-        (Conds3 ginit = [PA|Conds2 ginit]),
+        (Conds3 ginit = [PA|Conds2 ginit]), !,
       if (HRArgs = []) (Conds4 ginit = Conds3 ginit)
-        (Conds4 ginit = [std.forall2 RArgs HRArgs (h\ x\ coq.unify-eq h x ok)|Conds3 ginit]),
+        (Conds4 ginit = [std.forall2 RArgs HRArgs (h\ x\ coq.unify-eq h x ok)|Conds3 ginit]), !,
       if (HArgs = []) (Conds5 ginit gfinal = Conds4 ginit) (
         std.append HArgs Args H0,
         std.append HHyps H0 H1,
@@ -176,7 +176,7 @@ namespace hb {
             mem-sealed-goal ginit g;
             not (goal-is-class g);
             coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g []
-            ))|Conds4 ginit]),
+            ))|Conds4 ginit]), !,
       std.rev (Conds5 ginit gfinal : list prop) (Conds6 ginit gfinal)),
     Clause = (pi ginit gfinal\ C :- Conds6 ginit gfinal).
 
@@ -291,7 +291,7 @@ namespace hb {
           std.rev x [s|rparams],
           std.rev rparams params,
           std.forall2 params Params (h\ x\ coq.unify-eq h x ok),
-          y = app [TCPC|x]))),
+          y = app [TCPC|x]))), !,
     % Build unfolding and join clauses
     pi x y\ sigma args c\
 			std.append Params [x, y] args,
@@ -490,7 +490,7 @@ type class classname -> structure -> mixins -> hbclass.
 
 % class-def contains all the classes ever declared
 :index (10)
-pred class-def o:class.
+pred class-def o:hbclass.
 
 %%%%% Builders %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -658,7 +658,7 @@ declare-generic-coercion-elpi S :-
   %TODO: log.coq.coercion-elpi.declare 
   @global! => coq.elpi.accumulate current "coercion.db" (clause _ _ Clause).
 
-pred if-class-already-exists-error i:id, i:list class, i:list mixinname.
+pred if-class-already-exists-error i:id, i:list hbclass, i:list mixinname.
 if-class-already-exists-error _ [] _.
 if-class-already-exists-error N [class _ S ML1wP|CS] ML2 :-
   list-w-params_list ML1wP ML1,

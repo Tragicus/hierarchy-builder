@@ -298,7 +298,7 @@ assert-building-bottom-up CurrentClass C3n C1n C2n :-
        Msg2)
      true.
 
-func findall-newjoins class, list class -> list prop.
+func findall-newjoins hbclass, list hbclass -> list prop.
 findall-newjoins CurrentClass AllSuper Joins :-
   std.findall (distinct-pairs-below CurrentClass AllSuper C1_ C2_) JoinOf,
   CurrentClass = class C _ _,
