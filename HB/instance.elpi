@@ -264,7 +264,8 @@ ty->class (prod _ _ T) C :- !, pi x\ ty->class (T x) C.
 ty->class T C :- coq.safe-dest-app T C _.
 
 func decl-const-in-struct term, gref, string, term, term, term -> list constant, prop.
-decl-const-in-struct T _Class Name S STy SCS [CS, CS'] Clause :- std.do![
+decl-const-in-struct T0 _Class Name S STy SCS [CS, CS'] Clause :- std.do![
+  (@redflags! coq.redflags.betaiotazeta => coq.reduction.lazy.whd T0 T),
   if (ground_term S) (S1 = S, STy1 = STy, SCS1 = SCS)
     (abstract-holes.main S S1,
      std.assert-ok! (coq.typecheck S1 STy1) "HB: structure instance illtyped after generalizing over holes",

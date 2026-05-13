@@ -203,10 +203,12 @@ namespace hb {
     pi t x\ compile.largs Args Class ProofHd HHyps THyps As HRArgs (fun N t x) (coq.unify-eq T t ok, @pi-decl N T t\ coq.unify-eq (X t) (x t) ok) [] (Clause t x).
   compile.subject (sort U) Args Class ProofHd HHyps THyps As HRArgs Clause :- !,
     compile.largs Args Class ProofHd HHyps THyps As HRArgs (sort U) true [] Clause.
-  compile.subject S Args Class ProofHd HHyps THyps As HRArgs (pi x\ Clause x) :-
+  compile.subject S Args Class ProofHd HHyps THyps As HRArgs Clause :-
     coq.safe-dest-app S K SArgs,
     (K = global _; K = pglobal _ _; K = primitive _), !,
-    pi x\ compile.largs Args Class ProofHd HHyps THyps As HRArgs (app [K|x]) (std.forall2 SArgs x (x\y\ coq.unify-eq x y ok)) [] (Clause x).
+    if (SArgs = []) (compile.largs Args Class ProofHd HHyps THyps As HRArgs K true [] Clause) (
+      Clause = (pi x\ C x),
+      pi x\ compile.largs Args Class ProofHd HHyps THyps As HRArgs (app [K|x]) (std.forall2 SArgs x (x\y\ coq.unify-eq x y ok)) [] (C x)).
   
   % [compile.rargs Args PredName ProofHd HHyps THyps As HArgs Clause] abstracts over the arguments of the class
   % we are providing an instance for, from right to left, stopping at the rightmost argument which contains a pattern (e.g. not a local variable).
@@ -860,6 +862,7 @@ HB.mixin Record MixinName T & Factory1 T & … & FactoryN T := {
 
 #[arguments(raw)] Elpi Command HB.mixin.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1127,6 +1130,7 @@ Elpi Export HB.structure.
 
 #[arguments(raw)] Elpi Command HB.saturate.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1177,6 +1181,7 @@ HB.instance Definition N Params := Factory.Build Params T …
 
 #[arguments(raw)] Elpi Command HB.instance.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1221,6 +1226,7 @@ Elpi Export HB.instance.
 
 #[arguments(raw)] Elpi Command HB.factory.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1304,6 +1310,7 @@ HB.end.
 
 #[arguments(raw)] Elpi Command HB.builders.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1345,6 +1352,7 @@ Elpi Export HB.builders.
 
 #[arguments(raw)] Elpi Command HB.end.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1419,6 +1427,7 @@ Export Algebra.Exports.
 
 #[arguments(raw)] Elpi Command HB.export.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
@@ -1465,6 +1474,7 @@ Elpi Export HB.export.
 
 #[arguments(raw)] Elpi Command HB.reexport.
 Elpi Accumulate Db tc.db.
+Elpi Accumulate File tc_aux.
 Elpi Accumulate File "HB/common/stdpp.elpi".
 Elpi Accumulate File "HB/common/database.elpi".
 Elpi Accumulate File "HB/common/compat_acc_clauses_all.elpi".
