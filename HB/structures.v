@@ -301,7 +301,7 @@ namespace hb {
       UClause x y = (c :- !, reduce-loop PredName Params x x [y]),
       JClause x y =
         (pi kargs k p pc pn s m sc jc subject revkparams kparams coe revkparams kparams\ c :-
-          (subgoal; not reducing),
+          (not reducing),
           %Check that the subject is a projection...
           coq.safe-dest-app x k kargs,
           not (var k),
@@ -333,7 +333,10 @@ namespace hb {
               %And we extract the class
               coq.mk-app TCP [x] y)
             %If we have a real join, we introduce a fresh term x0
-            (sigma js x0 n n' v0 v1 v2 v3 v4 h hx x' jm coet\
+            (sigma js x0 n n' v0 v1 v2 v3 v4 h hx x' jm coet shd sargs\
+              %We check that the subject is not already the coercion we are about to insert, otherwise we may create an infinite loop with the typechecker, while reduction would be able to solve our goal.
+              coq.safe-dest-app subject shd sargs,
+              var shd,
               %We prepare the arguments of the coercions
               coq.env.indt jc v0 n v1 v2 v3 v4,
               calc (n - 1) n',

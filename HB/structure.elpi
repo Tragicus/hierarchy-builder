@@ -753,29 +753,38 @@ sort-cs-catch-all ClassName NParams :- std.do! [
   class-def (class ClassName S _),
   get-constructor S PackS,
   get-structure-sort-projection S Ssort',
+  get-structure-class-projection S _Sclass,
   if (Ssort' = primitive (proj ProjPP _))
    (coq.env.primitive-projection? ProjPP ProjPC _, Ssort = global (const ProjPC))
    (Ssort = Ssort'),
   if (calc NParams 0)
+    %then
     ((pi ctx rhs res\ 
         coq.elpi.predicate "cs" [ctx, Ssort, rhs, res] (CS0 ctx rhs res)),
     Clause = (
-      pi ctx rhs res cl ty g rem\
+      pi ctx rhs res cl clargs clargs' ty g rem\
       CS0 ctx rhs res :- std.do![
         coq.typecheck cl (app [global ClassName, rhs]) ok,
-        mk-app (global PackS) [rhs, cl] res,
         coq.ltac.collect-goals cl [g] [],
-        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem]))
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem,
+        %if (coq.safe-dest-app cl Sclass clargs)
+        %  (std.rev clargs [res|clargs'])
+          (mk-app (global PackS) [rhs, cl] res)
+        ]))
+    %else
     ((pi ctx params rhs res\ coq.elpi.predicate "cs" [ctx, (app [Ssort|params]), rhs, res] (CS ctx params rhs res)),
     Clause = (
-      pi ctx rhs res res' params paramsx paramsxc cl ty g rem\
+      pi ctx rhs res res' params paramsx paramsxc cl clargs clargs' ty g rem\
       CS ctx params rhs res :- std.do![
         std.append params [rhs] paramsx,
         coq.typecheck cl (app [global ClassName|paramsx]) ok,
         std.append paramsx [cl] paramsxc,
-        mk-app (global PackS) paramsxc res,
         coq.ltac.collect-goals cl [g] [],
-        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem])),
+        coq.ltac.open (coq.ltac.call-ltac1 "done_tc") g rem,
+        %if (coq.safe-dest-app cl Sclass clargs)
+        %  (std.rev clargs [res|clargs'])
+          (mk-app (global PackS) paramsxc res)
+        ])),
   coq.elpi.accumulate _ "cs.db" (clause _ _ Clause),
   if (get-option "export" tt)
     (coq.env.current-library File,
